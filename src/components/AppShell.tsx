@@ -53,6 +53,17 @@ export default function AppShell({
               Portal
             </button>
             <button
+              onClick={() => onNavigate("quick_check")}
+              className={`px-3 py-1 rounded-lg text-xs font-sans transition-colors cursor-pointer ${
+                activeView === "quick_check"
+                  ? "bg-cyan-50 border border-cyan-200 text-cyan-800 font-medium"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+              id="nav-quick-check"
+            >
+              Quick Check
+            </button>
+            <button
               onClick={() => onNavigate("dashboard")}
               className={`px-3 py-1 rounded-lg text-xs font-sans transition-colors cursor-pointer ${
                 activeView === "dashboard" || activeView === "new_case" || activeView === "case_detail" || activeView === "report_preview"

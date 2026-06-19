@@ -1,13 +1,14 @@
 import React from "react";
 import { motion } from "motion/react";
-import { ShieldCheck, Database, FileSpreadsheet, Lock, AlertCircle, ArrowRight } from "lucide-react";
+import { ShieldCheck, Database, FileSpreadsheet, Lock, AlertCircle, ArrowRight, Search } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 
 interface LandingHeroProps {
   onGetStarted: () => void;
+  onQuickCheck?: () => void;
 }
 
-export default function LandingHero({ onGetStarted }: LandingHeroProps) {
+export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroProps) {
   return (
     <div className="space-y-16 py-12" id="landing-hero-block">
       {/* Title & Core Subtext CTA Section */}
@@ -49,17 +50,43 @@ export default function LandingHero({ onGetStarted }: LandingHeroProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5, delay: 0.4 }}
-          className="pt-4"
+          className="pt-4 space-y-4"
           id="hero-cta-container"
         >
-          <button
-            onClick={onGetStarted}
-            className="group inline-flex items-center gap-3 px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-base font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer animate-none"
-            id="hero-get-started-btn"
-          >
-            Open Evidence Dashboard
-            <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            {onQuickCheck && (
+              <button
+                onClick={onQuickCheck}
+                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-base font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer"
+                id="hero-quick-check-btn"
+              >
+                <Search size={18} />
+                Quick Check a Suspicious Message
+              </button>
+            )}
+            <button
+              onClick={onGetStarted}
+              className="group inline-flex items-center gap-3 px-8 py-4 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-base font-semibold shadow-sm border border-slate-250 hover:border-slate-300 transition-all duration-150 cursor-pointer"
+              id="hero-get-started-btn"
+            >
+              Open Evidence Dashboard
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+
+          {onQuickCheck && (
+            <div className="max-w-xl mx-auto space-y-1.5">
+              <p className="text-[13px] text-slate-600 font-sans leading-relaxed">
+                Paste a suspicious SMS, upload a screenshot, or check a suspicious link. Get a quick
+                AI-assisted risk signal before creating a full case.
+              </p>
+              <p className="text-[11.5px] text-slate-500 font-sans inline-flex items-center gap-1.5 justify-center">
+                <Lock size={12} className="text-cyan-600 flex-shrink-0" />
+                Quick Check runs a redaction guard first. You choose whether to save or anonymously
+                share a redacted pattern.
+              </p>
+            </div>
+          )}
         </motion.div>
       </div>
 

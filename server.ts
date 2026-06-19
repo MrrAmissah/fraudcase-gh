@@ -5,6 +5,8 @@ import { createServer as createViteServer } from "vite";
 import { MOCK_CASES } from "./src/lib/mock/mockCases";
 import { FraudCase } from "./src/types/fraudCase";
 import { EvidenceItem } from "./src/types/evidence";
+import { ExtractedEntities } from "./src/types/analysis";
+import { QuickCheckResult } from "./src/types/quickCheck";
 import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
@@ -18,6 +20,70 @@ dotenv.config();
 // Port & Host binding required by the AI Studio reverse-proxy environment
 const PORT = 3000;
 const HOST = "0.0.0.0";
+
+// --- Public Quick Check (no-auth) abuse control + helpers ---
+const QC_DAILY_LIMIT = 15; // anonymous scans per IP per day
+const QC_MAX_INPUT_CHARS = 5000; // public input length cap
+const quickCheckHits = new Map<string, { count: number; day: string }>();
+
+// Best-effort per-IP daily limiter for the public endpoint. NOTE: x-forwarded-for is
+// client-spoofable, so this is a scaffold only — App Check / CAPTCHA is the real control
+// (tracked in docs/QUICK_CHECK_TODO.md).
+function quickCheckRateLimit(req: any, res: any, next: any) {
+  const ip = String(
+    String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+      req.socket?.remoteAddress ||
+      "unknown"
+  );
+  const today = new Date().toISOString().slice(0, 10);
+  const entry = quickCheckHits.get(ip);
+
+  if (!entry || entry.day !== today) {
+    quickCheckHits.set(ip, { count: 1, day: today });
+  } else if (entry.count >= QC_DAILY_LIMIT) {
+    res.status(429).json({
+      error: "You've reached today's free Quick Check limit. Create a free account to keep checking evidence.",
+    });
+    return;
+  } else {
+    entry.count += 1;
+  }
+
+  // Opportunistic cleanup of stale day buckets to bound memory.
+  if (quickCheckHits.size > 5000) {
+    for (const [k, v] of quickCheckHits) {
+      if (v.day !== today) quickCheckHits.delete(k);
+    }
+  }
+
+  next();
+}
+
+// Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
+// demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
+// present (URLs, monetary amounts, and phone tokens already masked by the redaction guard).
+function quickCheckEntities(redactedText: string): ExtractedEntities {
+  const urls = Array.from(
+    new Set((redactedText.match(/https?:\/\/[^\s]+/gi) || []).map((u) => u.replace(/[).,"']+$/g, "")))
+  );
+  const amounts = Array.from(
+    new Set(redactedText.match(/(?:GH[S₵]|₵|GHS)\s?\d[\d,]*(?:\.\d{1,2})?/gi) || [])
+  );
+  const phoneNumbers = Array.from(new Set(redactedText.match(/\d{2,4}\*{2,}\d{2,4}/g) || []));
+  return {
+    phoneNumbers,
+    urls,
+    names: [],
+    organizations: [],
+    amounts,
+    dates: [],
+    transactionReferences: [],
+    locations: [],
+  };
+}
+
+const QUICK_CHECK_DISCLAIMER =
+  "This quick result is AI-assisted and may be incomplete. It does not determine guilt, provide legal advice, or replace official investigation.";
 
 async function startServer() {
   const app = express();
@@ -754,6 +820,48 @@ async function startServer() {
     } catch (err: any) {
       console.error("Seed demo cases error:", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
+  // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
+  // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
+  app.post("/api/quick-check/analyze", quickCheckRateLimit, async (req: any, res: any) => {
+    try {
+      const { text } = req.body || {};
+      if (!text || typeof text !== "string" || !text.trim()) {
+        res.status(400).json({ error: "Paste a suspicious message or link to run a Quick Check." });
+        return;
+      }
+
+      const input = text.slice(0, QC_MAX_INPUT_CHARS);
+
+      // 1. Redact BEFORE analysis — raw text is never sent to the AI and never stored.
+      const redaction = redactPIIAndSecrets(input);
+
+      // 2. Analyze the redacted text only (server-side Gemini; heuristic fallback if no key).
+      const analysis = await analyzeFraudCase("Quick Check submission", redaction.redactedText, []);
+
+      // 3. Build an ephemeral result. Nothing is written to Firestore/Storage/disk.
+      const result: QuickCheckResult = {
+        quickCheckId: `qc-${Date.now()}`,
+        scamCategory: analysis.scamCategory,
+        riskScore: analysis.riskScore,
+        confidence: analysis.confidence,
+        shortSummary: analysis.shortSummary,
+        possibleFraudIndicators: analysis.suspiciousIndicators || [],
+        extractedEntities: quickCheckEntities(redaction.redactedText),
+        redactionWarnings: redaction.redactionWarnings || [],
+        recommendedNextSteps: analysis.recommendedNextSteps || [],
+        saveAsCaseAvailable: true, // CTA scaffolded for Phase 2 (no persistence yet)
+        shareRedactedSignalAvailable: false, // community signals = Phase 3
+        disclaimer: QUICK_CHECK_DISCLAIMER,
+      };
+
+      res.json(result);
+    } catch (err: any) {
+      console.error("Quick Check analyze error:", err);
+      res.status(500).json({ error: "Could not complete the Quick Check. Please try again." });
     }
   });
 

@@ -5,6 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import NewCasePage from "./pages/NewCasePage";
 import CaseDetailPage from "./pages/CaseDetailPage";
 import ReportPage from "./pages/ReportPage";
+import QuickCheckPage from "./pages/QuickCheckPage";
 import AuthPage from "./pages/AuthPage";
 import { FraudCase } from "./types/fraudCase";
 import { EvidenceType } from "./types/evidence";
@@ -28,7 +29,7 @@ function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
   
   const [activeView, setActiveView] = useState<
-    "landing" | "dashboard" | "new_case" | "case_detail" | "report_preview"
+    "landing" | "quick_check" | "dashboard" | "new_case" | "case_detail" | "report_preview"
   >("landing");
 
   const [cases, setCases] = useState<FraudCase[]>([]);
@@ -214,12 +215,12 @@ function AppContent() {
 
   // Intercept views when user is not authenticated, shielding case folders
   const handleNavigate = (view: any) => {
-    // If navigating to landing, allow without auth
-    if (view === "landing") {
-      setActiveView("landing");
+    // Public views — available without authentication.
+    if (view === "landing" || view === "quick_check") {
+      setActiveView(view);
       return;
     }
-    
+
     // For protected workspace, require user to sign in
     if (!user) {
       setActiveView("dashboard"); // Auth card will render
@@ -233,13 +234,19 @@ function AppContent() {
     if (activeView === "landing") {
       return (
         <LandingPage
-          onStart={() => {
-            if (user) {
-              setActiveView("dashboard");
-            } else {
-              setActiveView("dashboard"); // Displays auth page inside shell
-            }
-          }}
+          onStart={() => setActiveView("dashboard")}
+          onQuickCheck={() => setActiveView("quick_check")}
+        />
+      );
+    }
+
+    // Public Quick Check — intentionally available without authentication.
+    if (activeView === "quick_check") {
+      return (
+        <QuickCheckPage
+          onCreateAccount={() => setActiveView("dashboard")}
+          onStartFullCase={() => setActiveView(user ? "new_case" : "dashboard")}
+          onBackToLanding={() => setActiveView("landing")}
         />
       );
     }
