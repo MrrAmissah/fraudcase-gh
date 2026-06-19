@@ -86,7 +86,8 @@ function generateHeuristicMockAnalysis(
   description: string,
   evidence: EvidenceItem[]
 ): FraudAnalysis {
-  const combinedText = `${title} ${description} ${evidence.map(e => e.originalText || "").join(" ")}`.toLowerCase();
+  // Prefer redactedText (uploaded file contents are now stored redacted, not in originalText).
+  const combinedText = `${title} ${description} ${evidence.map(e => e.redactedText || e.originalText || "").join(" ")}`.toLowerCase();
 
   let category: FraudAnalysis["scamCategory"] = "unknown";
   let score = 30;
@@ -201,11 +202,12 @@ function generateHeuristicMockAnalysis(
       source: ev.type
     });
     
-    // Add extra matches
-    if (ev.originalText) {
-      const extraNums = ev.originalText.match(/0[235]\d{8}/g) || [];
+    // Add extra matches (use the same redacted-first text the categorizer reads).
+    const evText = ev.redactedText || ev.originalText;
+    if (evText) {
+      const extraNums = evText.match(/0[235]\d{8}/g) || [];
       extraNums.forEach(n => { if (!phoneNumbers.includes(n)) phoneNumbers.push(n); });
-      const extraUrls = ev.originalText.match(/https?:\/\/[^\s]+/g) || [];
+      const extraUrls = evText.match(/https?:\/\/[^\s]+/g) || [];
       extraUrls.forEach(u => {
         const trimmed = u.replace(/[",.)]/g, "");
         if (!urls.includes(trimmed)) urls.push(trimmed);

@@ -17,6 +17,7 @@ export interface EvidenceItem {
   fileName?: string;
   fileType?: string;
   fileSize?: number;
+  storageProvider?: "gcs" | "local-dev";
   storagePath?: string;
   fileUrl?: string;
   downloadUrl?: string;

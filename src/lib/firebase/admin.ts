@@ -12,6 +12,11 @@ const app = getApps().length === 0
 
 // Bind specifically to our provisioned custom Firestore database ID
 export const adminDb = getFirestore(app, "ai-studio-36d6feb3-b3c2-4e2a-9c6b-46c7b67a02e9");
+
+// Optional evidence fields (e.g. originalText/extractedText/storageProvider) may be
+// undefined; ignore them on write instead of throwing.
+adminDb.settings({ ignoreUndefinedProperties: true });
+
 export const adminAuth = getAuth(app);
 export const adminStorage = getStorage(app);
 

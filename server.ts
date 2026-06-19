@@ -8,6 +8,7 @@ import { EvidenceItem } from "./src/types/evidence";
 import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
+import { validateUploadedFile } from "./src/lib/security/fileValidation";
 import multer from "multer";
 import fs from "fs";
 
@@ -24,27 +25,40 @@ async function startServer() {
   // Parse incoming JSON requests up to 15mb
   app.use(express.json({ limit: "15mb" }));
 
-  // Configure multer for secure memory storage to stream direct to Firebase Cloud Storage
+  // Configure multer for secure memory storage. Files are held in memory only for
+  // processing (redaction + validation) and streamed to Cloud Storage — no permanent
+  // temp file is written on the happy path. See the upload route for the dev-only fallback.
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // Strict 10MB cap
   const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 10 * 1024 * 1024, // Strict 10MB file limitation limit check
+      fileSize: MAX_FILE_BYTES,
     },
   });
 
-  // Strict File Upload Allowlist and Sanitization Config
-  const ALLOWED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".pdf", ".txt", ".csv", ".json", ".html"];
-  const ALLOWED_MIME_TYPES = [
-    "image/png", 
-    "image/jpeg", 
-    "image/pjpeg",
-    "image/webp", 
-    "application/pdf", 
-    "text/plain", 
-    "text/csv", 
-    "application/json", 
-    "text/html"
-  ];
+  // Max characters of extracted text persisted per readable evidence item. Keeps a single
+  // evidence entry well under Firestore's 1 MiB per-document limit.
+  const MAX_EXTRACT_CHARS = 20000;
+
+  // Wrap multer so its errors (e.g. oversized file) return a clean 400 instead of
+  // falling through to the generic error handler as a 500.
+  function uploadSingle(req: any, res: any, next: any) {
+    upload.single("file")(req, res, (err: any) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            res.status(400).json({ error: "File exceeds the 10MB maximum upload size." });
+            return;
+          }
+          res.status(400).json({ error: `Upload rejected: ${err.message}` });
+          return;
+        }
+        res.status(400).json({ error: "Upload could not be processed." });
+        return;
+      }
+      next();
+    });
+  }
 
   function sanitizeFilename(name: string): string {
     const base = path.basename(name);
@@ -247,8 +261,9 @@ async function startServer() {
     }
   });
 
-  // Add a file evidence item to a case (verifying ownership, uploading to GCS with isolated fallback)
-  app.post("/api/cases/:id/evidence/upload", requireAuth, upload.single("file"), async (req: any, res: any) => {
+  // Add a file evidence item to a case. Validates content signatures, redacts readable
+  // file contents from the raw bytes, and stores honestly in Cloud Storage (dev-only local fallback).
+  app.post("/api/cases/:id/evidence/upload", requireAuth, uploadSingle, async (req: any, res: any) => {
     try {
       const { id } = req.params;
       const { type, title, originalText } = req.body;
@@ -263,23 +278,17 @@ async function startServer() {
         return;
       }
 
-      // Backend security: Validate file extensions and MIME claims strictly
-      const fileExt = path.extname(req.file.originalname).toLowerCase();
-      const fileMime = req.file.mimetype.toLowerCase();
-
-      const isAllowedExt = ALLOWED_EXTENSIONS.includes(fileExt);
-      const isAllowedMime = ALLOWED_MIME_TYPES.includes(fileMime);
-
-      if (!isAllowedExt || !isAllowedMime) {
-        res.status(400).json({ 
-          error: "Forbidden file type. Acceptable extension limits: PNG, JPG, WebP, PDF, TXT, CSV, JSON, HTML." 
-        });
+      // Backend security: validate extension, declared MIME, AND real content signature.
+      // Rejects files renamed/disguised to slip past the browser-side allowlist.
+      const validation = validateUploadedFile(req.file.originalname, req.file.mimetype, req.file.buffer);
+      if (!validation.ok) {
+        res.status(400).json({ error: validation.error });
         return;
       }
 
       const docRef = adminDb.collection("cases").doc(id);
       const doc = await docRef.get();
-      
+
       if (!doc.exists) {
         res.status(404).json({ error: "Fraud case target not found." });
         return;
@@ -292,14 +301,45 @@ async function startServer() {
       }
 
       const evidenceId = `ev-${Date.now()}`;
-      
-      // Sanitize the filename to prevent shell injection, path traversal or arbitrary writes
+
+      // Sanitize the filename to prevent path traversal or arbitrary writes
       const safeName = sanitizeFilename(req.file.originalname);
 
-      // Compute isolated path: users/{uid}/cases/{caseId}/evidence/{evidenceId}/{safeName}
+      // Isolated logical path: users/{uid}/cases/{caseId}/evidence/{evidenceId}/{safeName}
       const storagePath = `users/${req.user.uid}/cases/${id}/evidence/${evidenceId}/${safeName}`;
 
-      // 1. Upload to GCS / Firebase Cloud Storage
+      // --- Redaction: sanitize readable file contents from the raw bytes ---
+      // We read and redact the bytes server-side rather than trusting client-sent text,
+      // so raw PII in TXT/CSV/JSON/HTML never reaches Firestore, AI, or storage metadata.
+      // `redactedText` and `extractedText` are the SAME sanitized string so the
+      // EvidenceCard preview and the AI input can never diverge.
+      const isReadable = validation.isReadableText;
+      let safeText: string;
+      let redactionWarnings: string[] = [];
+      let detectedSensitiveTypes: string[] = [];
+
+      if (isReadable) {
+        let raw = req.file.buffer.toString("utf-8");
+        let truncated = false;
+        if (raw.length > MAX_EXTRACT_CHARS) {
+          raw = raw.slice(0, MAX_EXTRACT_CHARS);
+          truncated = true;
+        }
+        const r = redactPIIAndSecrets(raw);
+        safeText = r.redactedText + (truncated ? "\n…[content truncated for storage]" : "");
+        redactionWarnings = r.redactionWarnings;
+        detectedSensitiveTypes = r.detectedSensitiveTypes;
+      } else {
+        // Non-readable (image/PDF): redact any client-supplied description/OCR note only.
+        const note = originalText || `[File Attachment: ${safeName} · ${req.file.mimetype}]`;
+        const r = redactPIIAndSecrets(note);
+        safeText = r.redactedText;
+        redactionWarnings = r.redactionWarnings;
+        detectedSensitiveTypes = r.detectedSensitiveTypes;
+      }
+
+      // --- Honest storage: Cloud Storage first; local disk is a DEV-ONLY fallback ---
+      let storageProvider: "gcs" | "local-dev" | undefined;
       let gcsSuccess = false;
       try {
         const bucket = adminStorage.bucket();
@@ -311,27 +351,37 @@ async function startServer() {
             ownerId: req.user.uid,
             caseId: id,
             evidenceId: evidenceId,
-          }
+          },
         });
         gcsSuccess = true;
-        console.log(`Uploaded file successfully to ${storagePath}`);
+        console.log(`Evidence stored in Cloud Storage: ${storagePath}`);
       } catch (gcsErr: any) {
-        console.warn("Storage upload unsuccessful, leveraging redundant disk backup. Error:", gcsErr.message);
+        console.warn("Cloud Storage upload failed:", gcsErr.message);
       }
 
-      // 2. Save physical workspace backup fallback privately
-      try {
-        const localDir = path.join(process.cwd(), "secure_uploads", req.user.uid, id, evidenceId);
-        fs.mkdirSync(localDir, { recursive: true });
-        const localFilePath = path.join(localDir, safeName);
-        fs.writeFileSync(localFilePath, req.file.buffer);
-      } catch (localErr: any) {
-        console.error("Local disk backup save error:", localErr);
+      if (gcsSuccess) {
+        storageProvider = "gcs";
+      } else if (process.env.NODE_ENV === "production") {
+        // Never silently keep raw evidence on ephemeral local disk in production.
+        res.status(502).json({
+          error: "Evidence storage is temporarily unavailable; the file was not saved. Please retry.",
+        });
+        return;
+      } else {
+        // Development only: persist to the git-ignored local cache so the flow is testable
+        // without Cloud Storage credentials. Clearly marked as a dev-only fallback.
+        try {
+          const localDir = path.join(process.cwd(), "secure_uploads", req.user.uid, id, evidenceId);
+          fs.mkdirSync(localDir, { recursive: true });
+          fs.writeFileSync(path.join(localDir, safeName), req.file.buffer);
+          storageProvider = "local-dev";
+          console.warn(`[DEV-ONLY] Cloud Storage unavailable — evidence stored locally (provider=local-dev): ${storagePath}`);
+        } catch (localErr: any) {
+          console.error("Dev-only local storage failed:", localErr);
+          res.status(500).json({ error: "Could not store the evidence file." });
+          return;
+        }
       }
-
-      // 3. Process backend text safety redactions (could be OCR transcript or textual description)
-      const textToRedact = originalText || `[File Attachment: Name: ${safeName}, Type: ${req.file.mimetype}]`;
-      const redaction = redactPIIAndSecrets(textToRedact);
 
       const newEvidence: EvidenceItem = {
         id: evidenceId,
@@ -342,13 +392,16 @@ async function startServer() {
         fileName: safeName,
         fileType: req.file.mimetype,
         fileSize: req.file.size,
-        storagePath: storagePath,
+        storageProvider,
+        storagePath,
         fileUrl: `/api/cases/${id}/evidence/${evidenceId}/file`,
         downloadUrl: `/api/cases/${id}/evidence/${evidenceId}/file?download=true`,
-        originalText: originalText || undefined,
-        redactedText: redaction.redactedText || undefined,
-        redactionWarnings: redaction.redactionWarnings || [],
-        detectedSensitiveTypes: redaction.detectedSensitiveTypes || [],
+        // Raw readable file bytes are never persisted — only the redacted, length-capped text.
+        originalText: undefined,
+        extractedText: isReadable ? safeText : undefined,
+        redactedText: safeText || undefined,
+        redactionWarnings: redactionWarnings || [],
+        detectedSensitiveTypes: detectedSensitiveTypes || [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -421,7 +474,16 @@ async function startServer() {
         res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
       }
 
-      // 1. Try streaming from GCS
+      // Provider-aware retrieval. "local-dev" items (only created when Cloud Storage was
+      // unavailable in development) are served from disk; everything else streams from
+      // Cloud Storage with no phantom local fallback.
+      const provider = targetItem.storageProvider || (targetItem.storagePath ? "gcs" : "local-dev");
+
+      if (provider === "local-dev") {
+        serveLocalFile(req.user.uid, id, evidenceId, filename, res, contentType);
+        return;
+      }
+
       let served = false;
       try {
         const bucket = adminStorage.bucket();
@@ -430,19 +492,22 @@ async function startServer() {
         if (exists) {
           const readStream = fileRef.createReadStream();
           readStream.on("error", (streamErr) => {
-            console.error("GCS stream error. Falling back to local storage.", streamErr);
-            serveLocalFile(req.user.uid, id, evidenceId, filename, res, contentType);
+            console.error("Cloud Storage stream error.", streamErr);
+            if (!res.headersSent) {
+              res.status(502).json({ error: "Could not stream the stored evidence file." });
+            } else {
+              res.destroy();
+            }
           });
           readStream.pipe(res);
           served = true;
         }
       } catch (gcsStreamErr) {
-        console.warn("Could not query GCS stream. Falling back to local storage.", gcsStreamErr);
+        console.warn("Could not query Cloud Storage object.", gcsStreamErr);
       }
 
-      // 2. Try streaming from Local storage fallback
       if (!served) {
-        serveLocalFile(req.user.uid, id, evidenceId, filename, res, contentType);
+        res.status(404).json({ error: "The evidence file could not be located in Cloud Storage." });
       }
     } catch (err: any) {
       console.error("Secure file retrieval error:", err);
