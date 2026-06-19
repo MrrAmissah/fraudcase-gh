@@ -4,11 +4,13 @@ import {
   ShieldCheck,
   Copy,
   Check,
+  Save,
   UserPlus,
-  FolderPlus,
   Share2,
   RotateCcw,
   ListChecks,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import { QuickCheckResult } from "../types/quickCheck";
 import { getRiskLevel, getScamCategoryLabel } from "../lib/utils/risk";
@@ -17,15 +19,19 @@ import ExtractedEntitiesTable from "./ExtractedEntitiesTable";
 
 interface QuickCheckResultCardProps {
   result: QuickCheckResult;
-  onCreateAccount: () => void;
-  onStartFullCase: () => void;
+  isAuthenticated: boolean;
+  isSaving: boolean;
+  saveError: string | null;
+  onSave: () => void;
   onNewCheck: () => void;
 }
 
 export default function QuickCheckResultCard({
   result,
-  onCreateAccount,
-  onStartFullCase,
+  isAuthenticated,
+  isSaving,
+  saveError,
+  onSave,
   onNewCheck,
 }: QuickCheckResultCardProps) {
   const [copied, setCopied] = useState(false);
@@ -144,20 +150,23 @@ export default function QuickCheckResultCard({
         <h4 className="text-[14px] font-semibold text-slate-800 font-sans tracking-tight">What next?</h4>
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={onCreateAccount}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all"
-            id="quick-check-create-account"
+            onClick={onSave}
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all disabled:opacity-50"
+            id="quick-check-save-case"
           >
-            <UserPlus size={14} />
-            Create a free account to save cases
-          </button>
-          <button
-            onClick={onStartFullCase}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all"
-            id="quick-check-start-case"
-          >
-            <FolderPlus size={14} className="text-slate-500" />
-            Start a full case
+            {isSaving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : isAuthenticated ? (
+              <Save size={14} />
+            ) : (
+              <UserPlus size={14} />
+            )}
+            {isSaving
+              ? "Saving…"
+              : isAuthenticated
+              ? "Save as private case"
+              : "Create a free account to save this"}
           </button>
           <button
             onClick={handleCopy}
@@ -178,16 +187,26 @@ export default function QuickCheckResultCard({
           </button>
           <button
             onClick={onNewCheck}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-sans font-medium cursor-pointer transition-all"
+            disabled={isSaving}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-sans font-medium cursor-pointer transition-all disabled:opacity-50"
             id="quick-check-new"
           >
             <RotateCcw size={13} />
             New check
           </button>
         </div>
+
+        {saveError && (
+          <div className="text-[11.5px] text-red-600 bg-red-50/60 border border-red-150 px-3 py-2 rounded-lg flex items-start gap-1.5 font-sans font-medium" id="quick-check-save-error">
+            <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+            <span>{saveError}</span>
+          </div>
+        )}
+
         <p className="text-[11px] text-slate-500 font-sans leading-normal">
-          Nothing from this Quick Check has been saved. Create a free account if you want to keep a
-          private case and add more evidence.
+          {isAuthenticated
+            ? "This creates a private case in your workspace from the redacted result. You can add more evidence there."
+            : "We'll keep only this redacted result while you sign in, then create your private case. Nothing is stored anonymously."}
         </p>
       </div>
 

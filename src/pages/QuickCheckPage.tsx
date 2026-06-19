@@ -7,23 +7,26 @@ import { runQuickCheck } from "../lib/quickCheck/quickCheckClient";
 import { QuickCheckResult } from "../types/quickCheck";
 
 interface QuickCheckPageProps {
-  onCreateAccount: () => void;
-  onStartFullCase: () => void;
+  isAuthenticated: boolean;
+  /** Persists the redacted result as a private case (signed in) or stashes it for after sign-in. */
+  onSaveAsCase: (result: QuickCheckResult) => Promise<void>;
   onBackToLanding: () => void;
 }
 
 /**
  * Public, no-sign-up Quick Check flow: Input → Analyze → Result. Renders without an
- * authenticated user (mounted before the auth gate in App.tsx). Nothing is persisted.
+ * authenticated user (mounted before the auth gate in App.tsx). Nothing anonymous is persisted.
  */
 export default function QuickCheckPage({
-  onCreateAccount,
-  onStartFullCase,
+  isAuthenticated,
+  onSaveAsCase,
   onBackToLanding,
 }: QuickCheckPageProps) {
   const [result, setResult] = useState<QuickCheckResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleAnalyze = async (text: string) => {
     setIsLoading(true);
@@ -38,9 +41,24 @@ export default function QuickCheckPage({
     }
   };
 
+  const handleSave = async () => {
+    if (!result) return;
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      await onSaveAsCase(result);
+      // On success the app navigates away (to the new case or to sign-in); no further UI needed.
+    } catch (err: any) {
+      setSaveError(err?.message || "We couldn't save this as a case just now. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleNewCheck = () => {
     setResult(null);
     setError(null);
+    setSaveError(null);
   };
 
   return (
@@ -61,8 +79,10 @@ export default function QuickCheckPage({
       ) : (
         <QuickCheckResultCard
           result={result}
-          onCreateAccount={onCreateAccount}
-          onStartFullCase={onStartFullCase}
+          isAuthenticated={isAuthenticated}
+          isSaving={isSaving}
+          saveError={saveError}
+          onSave={handleSave}
           onNewCheck={handleNewCheck}
         />
       )}

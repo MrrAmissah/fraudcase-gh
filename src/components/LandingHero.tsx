@@ -77,8 +77,7 @@ export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroP
           {onQuickCheck && (
             <div className="max-w-xl mx-auto space-y-1.5">
               <p className="text-[13px] text-slate-600 font-sans leading-relaxed">
-                Paste a suspicious SMS, upload a screenshot, or check a suspicious link. Get a quick
-                AI-assisted risk signal before creating a full case.
+                No sign-up required — run an instant first scan before you decide to open a full case.
               </p>
               <p className="text-[11.5px] text-slate-500 font-sans inline-flex items-center gap-1.5 justify-center">
                 <Lock size={12} className="text-cyan-600 flex-shrink-0" />

@@ -9,6 +9,8 @@ import QuickCheckPage from "./pages/QuickCheckPage";
 import AuthPage from "./pages/AuthPage";
 import { FraudCase } from "./types/fraudCase";
 import { EvidenceType } from "./types/evidence";
+import { QuickCheckResult } from "./types/quickCheck";
+import { getScamCategoryLabel } from "./lib/utils/risk";
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 // Firebase imports
@@ -24,6 +26,9 @@ import {
   updateCase,
   seedDemoCases,
 } from "./lib/firebase/firestore";
+
+// sessionStorage key holding ONLY a redacted QuickCheckResult while an anonymous user signs in.
+const PENDING_QUICK_CHECK_KEY = "fraudcase.pendingQuickCheck";
 
 function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -45,7 +50,10 @@ function AppContent() {
   // Sync cases lists from Express server DB State on authentication changes
   useEffect(() => {
     if (user) {
-      fetchCases();
+      (async () => {
+        await fetchCases();
+        await resumePendingQuickCheck();
+      })();
     } else {
       setCases([]);
       setActiveCaseId(null);
@@ -61,6 +69,82 @@ function AppContent() {
     } catch (err: any) {
       console.error("Could not trace cases from Firestore endpoint: ", err);
       setApiError("Database error: Could not load case files from workspace partition.");
+    } finally {
+      setGlobalLoading(false);
+    }
+  };
+
+  // Build a private case from a redacted Quick Check result using the EXISTING authenticated
+  // case API (create -> add redacted evidence -> analyze). No new server surface; owner-isolated.
+  const saveQuickCheckAsCase = async (result: QuickCheckResult): Promise<FraudCase> => {
+    const title = `Quick Check: ${getScamCategoryLabel(result.scamCategory)}`;
+    const description = result.shortSummary || "Imported from a public Quick Check scan.";
+
+    const created = await createCase(title, description);
+    await addEvidence(created.id, {
+      type: "note",
+      title: "Imported from Quick Check",
+      originalText: result.redactedText, // already redacted/masked — no raw input
+    });
+    return analyzeCase(created.id);
+  };
+
+  // Save action invoked from the Quick Check result card.
+  const handleSaveQuickCheckAsCase = async (result: QuickCheckResult) => {
+    if (!user) {
+      // Signed out: stash ONLY the redacted result, then route to the auth screen.
+      try {
+        sessionStorage.setItem(PENDING_QUICK_CHECK_KEY, JSON.stringify(result));
+      } catch (e) {
+        console.warn("Could not stash Quick Check result:", e);
+      }
+      setActiveView("dashboard"); // AuthPage renders while signed out
+      return;
+    }
+
+    // Signed in: create the private case now and open it. Throws on failure so the
+    // Quick Check page can show a calm, recoverable error (no navigation on failure).
+    const created = await saveQuickCheckAsCase(result);
+    setCases((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+    setActiveCaseId(created.id);
+    setActiveView("case_detail");
+  };
+
+  // After sign-in, turn any stashed redacted Quick Check result into a private case.
+  const resumePendingQuickCheck = async () => {
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem(PENDING_QUICK_CHECK_KEY);
+    } catch {
+      return;
+    }
+    if (!raw) return;
+
+    // Clear first so an effect re-run cannot double-create the case.
+    try {
+      sessionStorage.removeItem(PENDING_QUICK_CHECK_KEY);
+    } catch {
+      /* ignore */
+    }
+
+    let result: QuickCheckResult;
+    try {
+      result = JSON.parse(raw) as QuickCheckResult;
+    } catch {
+      return;
+    }
+
+    try {
+      setGlobalLoading(true);
+      const created = await saveQuickCheckAsCase(result);
+      setCases((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+      setActiveCaseId(created.id);
+      setActiveView("case_detail");
+    } catch (err) {
+      console.error("Could not save pending Quick Check after sign-in:", err);
+      setApiError(
+        "You're signed in, but we couldn't save your Quick Check result. You can start a new case from your dashboard."
+      );
     } finally {
       setGlobalLoading(false);
     }
@@ -244,8 +328,8 @@ function AppContent() {
     if (activeView === "quick_check") {
       return (
         <QuickCheckPage
-          onCreateAccount={() => setActiveView("dashboard")}
-          onStartFullCase={() => setActiveView(user ? "new_case" : "dashboard")}
+          isAuthenticated={!!user}
+          onSaveAsCase={handleSaveQuickCheckAsCase}
           onBackToLanding={() => setActiveView("landing")}
         />
       );

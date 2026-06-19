@@ -845,6 +845,7 @@ async function startServer() {
       // 3. Build an ephemeral result. Nothing is written to Firestore/Storage/disk.
       const result: QuickCheckResult = {
         quickCheckId: `qc-${Date.now()}`,
+        redactedText: redaction.redactedText,
         scamCategory: analysis.scamCategory,
         riskScore: analysis.riskScore,
         confidence: analysis.confidence,
