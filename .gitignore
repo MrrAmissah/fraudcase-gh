@@ -6,3 +6,11 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local evidence file copies written by the upload handler (contains user PII)
+secure_uploads/
+
+# Service-account / admin credential keys (never commit real secrets)
+*.serviceAccount.json
+service-account*.json
+firebase-adminsdk*.json
