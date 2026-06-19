@@ -31,5 +31,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Anonymous community fraud signals — written/read only by the backend (Admin SDK),
+    // which bypasses these rules. Clients must never read or write them directly.
+    // Admin review access (Phase 4) is mediated server-side, not via client rules.
+    match /communitySignals/{signalId} {
+      allow read, write: if false;
+    }
   }
 }

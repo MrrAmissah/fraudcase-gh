@@ -22,42 +22,57 @@ const PORT = 3000;
 const HOST = "0.0.0.0";
 
 // --- Public Quick Check (no-auth) abuse control + helpers ---
-const QC_DAILY_LIMIT = 15; // anonymous scans per IP per day
+const QC_DAILY_LIMIT = 15; // anonymous analyze scans per IP per day
+const SIGNAL_DAILY_LIMIT = 10; // anonymous community-signal submissions per IP per day
 const QC_MAX_INPUT_CHARS = 5000; // public input length cap
-const quickCheckHits = new Map<string, { count: number; day: string }>();
 
-// Best-effort per-IP daily limiter for the public endpoint. NOTE: x-forwarded-for is
+// Best-effort per-IP daily limiter for public endpoints. NOTE: x-forwarded-for is
 // client-spoofable, so this is a scaffold only — App Check / CAPTCHA is the real control
 // (tracked in docs/QUICK_CHECK_TODO.md).
-function quickCheckRateLimit(req: any, res: any, next: any) {
-  const ip = String(
-    String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
-      req.socket?.remoteAddress ||
-      "unknown"
-  );
-  const today = new Date().toISOString().slice(0, 10);
-  const entry = quickCheckHits.get(ip);
+function makeDailyRateLimit(
+  store: Map<string, { count: number; day: string }>,
+  limit: number,
+  overLimitMessage: string
+) {
+  return function (req: any, res: any, next: any) {
+    const ip = String(
+      String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+        req.socket?.remoteAddress ||
+        "unknown"
+    );
+    const today = new Date().toISOString().slice(0, 10);
+    const entry = store.get(ip);
 
-  if (!entry || entry.day !== today) {
-    quickCheckHits.set(ip, { count: 1, day: today });
-  } else if (entry.count >= QC_DAILY_LIMIT) {
-    res.status(429).json({
-      error: "You've reached today's free Quick Check limit. Create a free account to keep checking evidence.",
-    });
-    return;
-  } else {
-    entry.count += 1;
-  }
-
-  // Opportunistic cleanup of stale day buckets to bound memory.
-  if (quickCheckHits.size > 5000) {
-    for (const [k, v] of quickCheckHits) {
-      if (v.day !== today) quickCheckHits.delete(k);
+    if (!entry || entry.day !== today) {
+      store.set(ip, { count: 1, day: today });
+    } else if (entry.count >= limit) {
+      res.status(429).json({ error: overLimitMessage });
+      return;
+    } else {
+      entry.count += 1;
     }
-  }
 
-  next();
+    // Opportunistic cleanup of stale day buckets to bound memory.
+    if (store.size > 5000) {
+      for (const [k, v] of store) {
+        if (v.day !== today) store.delete(k);
+      }
+    }
+
+    next();
+  };
 }
+
+const quickCheckRateLimit = makeDailyRateLimit(
+  new Map<string, { count: number; day: string }>(),
+  QC_DAILY_LIMIT,
+  "You've reached today's free Quick Check limit. Create a free account to keep checking evidence."
+);
+const submitSignalRateLimit = makeDailyRateLimit(
+  new Map<string, { count: number; day: string }>(),
+  SIGNAL_DAILY_LIMIT,
+  "You've reached today's limit for sharing community signals. Please try again tomorrow."
+);
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
 // demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
@@ -84,6 +99,45 @@ function quickCheckEntities(redactedText: string): ExtractedEntities {
 
 const QUICK_CHECK_DISCLAIMER =
   "This quick result is AI-assisted and may be incomplete. It does not determine guilt, provide legal advice, or replace official investigation.";
+
+// --- Community signal helpers (Phase 3): derive safe, masked metadata server-side ---
+function firstUrl(text: string): string | null {
+  const m = text.match(/https?:\/\/[^\s]+/i);
+  return m ? m[0].replace(/[).,"']+$/g, "") : null;
+}
+
+function normalizeDomain(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function cappedStringArray(value: any, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((v) => typeof v === "string")
+    .slice(0, maxItems)
+    .map((v) => v.slice(0, maxLen));
+}
+
+// Re-derive a safe entities object for an anonymous signal. Drops any phone token that is not
+// masked, and never stores names or transaction references.
+function safeSignalEntities(entities: any): ExtractedEntities {
+  const e = entities && typeof entities === "object" ? entities : {};
+  return {
+    phoneNumbers: cappedStringArray(e.phoneNumbers, 10, 40).filter((p) => p.includes("*")),
+    urls: cappedStringArray(e.urls, 20, 300),
+    names: [],
+    organizations: cappedStringArray(e.organizations, 20, 120),
+    amounts: cappedStringArray(e.amounts, 20, 40),
+    dates: cappedStringArray(e.dates, 20, 40),
+    transactionReferences: [],
+    locations: cappedStringArray(e.locations, 20, 120),
+  };
+}
 
 async function startServer() {
   const app = express();
@@ -866,6 +920,77 @@ async function startServer() {
     }
   });
 
+  // --- PUBLIC COMMUNITY SIGNAL SUBMISSION (no auth; rate-limited; redacted-only) ---
+  // Stores ONLY redacted/derived data for later admin pattern review. No raw input, no files,
+  // no full identifiers. Requires explicit consent.
+  app.post("/api/quick-check/submit-signal", submitSignalRateLimit, async (req: any, res: any) => {
+    try {
+      const { consentGiven, result } = req.body || {};
+
+      if (consentGiven !== true) {
+        res.status(400).json({ error: "Consent is required to share a community signal." });
+        return;
+      }
+      if (!result || typeof result !== "object") {
+        res.status(400).json({ error: "Missing Quick Check result data." });
+        return;
+      }
+
+      const redactedText =
+        typeof result.redactedText === "string" ? result.redactedText.slice(0, QC_MAX_INPUT_CHARS) : "";
+      if (!redactedText.trim()) {
+        res.status(400).json({ error: "A redacted result is required to share a signal." });
+        return;
+      }
+
+      // Privacy guard: a properly redacted string is idempotent under the redaction guard.
+      // If re-redacting changes it, raw sensitive data is present — reject, store nothing.
+      const recheck = redactPIIAndSecrets(redactedText);
+      if (recheck.redactedText !== redactedText) {
+        res.status(400).json({
+          error: "Submission appears to contain unredacted sensitive data and was not stored.",
+        });
+        return;
+      }
+
+      const entities = safeSignalEntities(result.extractedEntities);
+      const normalizedDomainValue = normalizeDomain(entities.urls[0] || firstUrl(redactedText));
+      const maskedPhone = entities.phoneNumbers[0] || null;
+      const amountRequested = entities.amounts[0] || null;
+
+      const signalId = `sig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const signal = {
+        source: "quick_check",
+        consentGiven: true,
+        redactedText,
+        scamCategory: typeof result.scamCategory === "string" ? result.scamCategory : "unknown",
+        riskScore: typeof result.riskScore === "number" ? result.riskScore : 0,
+        confidence: typeof result.confidence === "string" ? result.confidence : "low",
+        // Defensive: indicators are analysis text, but redact them too so no raw PII can leak.
+        possibleFraudIndicators: cappedStringArray(result.possibleFraudIndicators, 20, 500).map(
+          (s) => redactPIIAndSecrets(s).redactedText
+        ),
+        extractedEntities: entities,
+        normalizedDomain: normalizedDomainValue,
+        normalizedSender: null,
+        maskedPhone,
+        amountRequested,
+        countryContext: "GH",
+        createdAt: new Date().toISOString(),
+        reviewedStatus: "pending",
+        clusterId: null,
+        userId: null,
+        rawFileStored: false,
+      };
+
+      await adminDb.collection("communitySignals").doc(signalId).set(signal);
+      res.status(201).json({ success: true });
+    } catch (err: any) {
+      console.error("Submit community signal error:", err);
+      res.status(500).json({ error: "Could not submit the signal. Please try again." });
+    }
+  });
+
   // --- COMPILER DEV / PROD MIDDLEWARES ---
 
   if (process.env.NODE_ENV !== "production") {
@@ -889,6 +1014,13 @@ async function startServer() {
     console.log(`FraudCase GH [Fullstack Service] listening at http://${HOST}:${PORT}`);
   });
 }
+
+// Prevent a rejected background promise (e.g. a Firebase Admin credential lookup when running
+// without Application Default Credentials) from terminating the process. Public, unauthenticated
+// endpoints must never be able to crash the server via an unhandled rejection.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled promise rejection:", reason);
+});
 
 startServer().catch((error) => {
   console.error("Critical: Failed to boot custom Express + Vite server:", error);

@@ -11,6 +11,7 @@ import {
   ListChecks,
   Loader2,
   AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { QuickCheckResult } from "../types/quickCheck";
 import { getRiskLevel, getScamCategoryLabel } from "../lib/utils/risk";
@@ -24,6 +25,8 @@ interface QuickCheckResultCardProps {
   saveError: string | null;
   onSave: () => void;
   onNewCheck: () => void;
+  /** Submits the redacted result as an anonymous community signal. Throws on failure. */
+  onShareSignal: () => Promise<void>;
 }
 
 export default function QuickCheckResultCard({
@@ -33,8 +36,23 @@ export default function QuickCheckResultCard({
   saveError,
   onSave,
   onNewCheck,
+  onShareSignal,
 }: QuickCheckResultCardProps) {
   const [copied, setCopied] = useState(false);
+  const [shareState, setShareState] = useState<"idle" | "consent" | "sharing" | "done">("idle");
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  const handleConfirmShare = async () => {
+    setShareState("sharing");
+    setShareError(null);
+    try {
+      await onShareSignal();
+      setShareState("done");
+    } catch (err: any) {
+      setShareError(err?.message || "Could not share the signal. Please try again.");
+      setShareState("consent");
+    }
+  };
   const risk = getRiskLevel(result.riskScore);
   const hasWarnings = result.redactionWarnings && result.redactionWarnings.length > 0;
 
@@ -177,15 +195,6 @@ export default function QuickCheckResultCard({
             {copied ? "Copied" : "Copy summary"}
           </button>
           <button
-            disabled
-            title="Anonymous community fraud signals are coming soon."
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 text-slate-400 rounded-lg text-xs font-sans font-semibold cursor-not-allowed"
-            id="quick-check-share-signal"
-          >
-            <Share2 size={14} />
-            Share redacted signal (coming soon)
-          </button>
-          <button
             onClick={onNewCheck}
             disabled={isSaving}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-slate-500 hover:text-slate-800 rounded-lg text-xs font-sans font-medium cursor-pointer transition-all disabled:opacity-50"
@@ -208,6 +217,65 @@ export default function QuickCheckResultCard({
             ? "This creates a private case in your workspace from the redacted result. You can add more evidence there."
             : "We'll keep only this redacted result while you sign in, then create your private case. Nothing is stored anonymously."}
         </p>
+
+        {/* Optional, consent-gated community signal sharing */}
+        <div className="pt-3 border-t border-cyan-100/70" id="quick-check-community-signal">
+          {shareState === "done" ? (
+            <div className="flex items-start gap-2 text-[12px] text-emerald-700 bg-emerald-50/60 border border-emerald-150 rounded-lg px-3 py-2.5 font-sans">
+              <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span>Thanks. A redacted signal has been submitted for pattern review.</span>
+            </div>
+          ) : shareState === "consent" || shareState === "sharing" ? (
+            <div className="space-y-2.5 bg-white border border-slate-200 rounded-lg p-3.5">
+              <div className="flex items-start gap-2">
+                <Share2 size={15} className="text-cyan-600 flex-shrink-0 mt-0.5" />
+                <p className="text-[12px] text-slate-600 font-sans leading-relaxed">
+                  FraudCase GH can keep a redacted copy of this result to help identify recurring scam
+                  patterns. We do not publish your submission, and this does not become an official
+                  report.
+                </p>
+              </div>
+
+              {shareError && (
+                <div className="text-[11.5px] text-red-600 bg-red-50/60 border border-red-150 px-3 py-2 rounded-lg flex items-start gap-1.5 font-sans font-medium">
+                  <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />
+                  <span>{shareError}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={handleConfirmShare}
+                  disabled={shareState === "sharing"}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all disabled:opacity-50"
+                  id="confirm-share-signal"
+                >
+                  {shareState === "sharing" ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+                  {shareState === "sharing" ? "Sharing…" : "Share redacted signal"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShareState("idle");
+                    setShareError(null);
+                  }}
+                  disabled={shareState === "sharing"}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShareState("consent")}
+              className="inline-flex items-center gap-1.5 text-[12px] text-cyan-700 hover:text-cyan-800 font-sans font-semibold cursor-pointer"
+              id="open-share-signal"
+            >
+              <Share2 size={14} />
+              Share a redacted signal to help spot recurring scams
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 7. Disclaimer */}

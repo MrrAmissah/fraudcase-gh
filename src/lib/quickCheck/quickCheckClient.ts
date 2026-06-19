@@ -21,3 +21,23 @@ export async function runQuickCheck(text: string): Promise<QuickCheckResult> {
 
   return response.json();
 }
+
+/**
+ * Submit a redacted Quick Check result as an anonymous community signal. No auth.
+ * Sends only the already-redacted result; the server re-verifies redaction and stores
+ * masked/derived data only.
+ */
+export async function submitQuickCheckSignal(result: QuickCheckResult): Promise<void> {
+  const response = await fetch("/api/quick-check/submit-signal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consentGiven: true, result }),
+  });
+
+  if (!response.ok) {
+    const err = await response
+      .json()
+      .catch(() => ({ error: "Could not submit the signal." }));
+    throw new Error(err.error || response.statusText);
+  }
+}

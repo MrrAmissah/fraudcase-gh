@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import QuickCheckHero from "../components/QuickCheckHero";
 import QuickCheckInputPanel from "../components/QuickCheckInputPanel";
 import QuickCheckResultCard from "../components/QuickCheckResultCard";
-import { runQuickCheck } from "../lib/quickCheck/quickCheckClient";
+import { runQuickCheck, submitQuickCheckSignal } from "../lib/quickCheck/quickCheckClient";
 import { QuickCheckResult } from "../types/quickCheck";
 
 interface QuickCheckPageProps {
@@ -55,6 +55,13 @@ export default function QuickCheckPage({
     }
   };
 
+  // Submits the redacted result as an anonymous community signal. Throws on failure so the
+  // result card can show a calm error and keep the consent panel open for retry.
+  const handleShareSignal = async () => {
+    if (!result) return;
+    await submitQuickCheckSignal(result);
+  };
+
   const handleNewCheck = () => {
     setResult(null);
     setError(null);
@@ -84,6 +91,7 @@ export default function QuickCheckPage({
           saveError={saveError}
           onSave={handleSave}
           onNewCheck={handleNewCheck}
+          onShareSignal={handleShareSignal}
         />
       )}
     </div>

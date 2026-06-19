@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "motion/react";
-import { ShieldCheck, Database, FileSpreadsheet, Lock, AlertCircle, ArrowRight, Search } from "lucide-react";
+import { ShieldCheck, Database, FileSpreadsheet, AlertCircle, ArrowRight, Search, Info } from "lucide-react";
 import BrandLogo from "./BrandLogo";
 
 interface LandingHeroProps {
@@ -75,15 +75,13 @@ export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroP
           </div>
 
           {onQuickCheck && (
-            <div className="max-w-xl mx-auto space-y-1.5">
-              <p className="text-[13px] text-slate-600 font-sans leading-relaxed">
-                No sign-up required — run an instant first scan before you decide to open a full case.
-              </p>
-              <p className="text-[11.5px] text-slate-500 font-sans inline-flex items-center gap-1.5 justify-center">
-                <Lock size={12} className="text-cyan-600 flex-shrink-0" />
-                Quick Check runs a redaction guard first. You choose whether to save or anonymously
-                share a redacted pattern.
-              </p>
+            <div className="flex justify-center">
+              <span className="group relative inline-flex items-center cursor-help" tabIndex={0}>
+                <Info size={15} className="text-slate-400 hover:text-slate-600 transition-colors" />
+                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2 bg-slate-800 text-white text-[11px] font-sans leading-normal rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity z-20 shadow-lg">
+                  No sign-up required — run an instant first scan before you decide to open a full case.
+                </span>
+              </span>
             </div>
           )}
         </motion.div>
