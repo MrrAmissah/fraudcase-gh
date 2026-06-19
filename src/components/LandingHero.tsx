@@ -57,11 +57,15 @@ export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroP
             {onQuickCheck && (
               <button
                 onClick={onQuickCheck}
-                className="group inline-flex items-center gap-2.5 px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-base font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer"
+                className="group relative inline-flex items-center gap-2.5 px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-base font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer"
                 id="hero-quick-check-btn"
               >
                 <Search size={18} />
                 Quick Check a Suspicious Message
+                <Info size={15} className="text-white/75" />
+                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 w-64 px-3 py-2 bg-slate-800 text-white text-[11px] font-normal font-sans leading-normal rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity z-20 shadow-lg text-center">
+                  No sign-up required — run an instant first scan before you decide to open a full case.
+                </span>
               </button>
             )}
             <button
@@ -74,16 +78,6 @@ export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroP
             </button>
           </div>
 
-          {onQuickCheck && (
-            <div className="flex justify-center">
-              <span className="group relative inline-flex items-center cursor-help" tabIndex={0}>
-                <Info size={15} className="text-slate-400 hover:text-slate-600 transition-colors" />
-                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 w-64 px-3 py-2 bg-slate-800 text-white text-[11px] font-sans leading-normal rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity z-20 shadow-lg">
-                  No sign-up required — run an instant first scan before you decide to open a full case.
-                </span>
-              </span>
-            </div>
-          )}
         </motion.div>
       </div>
 
