@@ -1,0 +1,6 @@
+{
+  "name": "FraudCase GH",
+  "description": "AI-assisted fraud evidence organizer for Ghanaian individuals, freelancers, and SMEs to securely collect, analyze, and export structured case reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

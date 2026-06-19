@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Core Cases Collection
+    match /cases/{caseId} {
+      // Users can only view cases they own
+      allow read: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      
+      // Users can only create cases where they are the owner
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      
+      // Users can only update/delete cases they own and cannot transfer ownership (ownerId is immutable)
+      allow update: if request.auth != null 
+                    && resource.data.ownerId == request.auth.uid 
+                    && request.resource.data.ownerId == request.auth.uid;
+                    
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      
+      // Nested subcollections rules (if subcollections are used in the future)
+      match /evidence/{evidenceId} {
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/cases/$(caseId)).data.ownerId == request.auth.uid;
+      }
+      match /analysis/{analysisId} {
+        allow read, write: if request.auth != null && get(/databases/$(database)/documents/cases/$(caseId)).data.ownerId == request.auth.uid;
+      }
+    }
+
+    // User profiles (optional future-proofing)
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

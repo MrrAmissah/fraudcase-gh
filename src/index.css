@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Print Specific Rules for Dossier Exports */
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  #app-header, 
+  #forensic-safety-banner, 
+  #app-footer,
+  #preview-control-bar {
+    display: none !important;
+  }
+  
+  #app-shell {
+    background: white !important;
+    color: black !important;
+    min-height: auto !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .printable-sheet {
+    border: none !important;
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  h1, h2, h3, h4, span, p, td, th {
+    color: black !important;
+  }
+
+  .border, .border-slate-200, .border-slate-250, .border-slate-800, .border-slate-850 {
+    border-color: #d1d5db !important;
+  }
+
+  .bg-slate-900\/30, .bg-\[\#0c1221\], .bg-slate-950\/40, .bg-slate-950\/80 {
+    background-color: #f3f4f6 !important;
+  }
+}
+
+/* Smooth fade-in visual styling */
+.animate-fade-in-out {
+  animation: key-fade 2s ease-in-out infinite;
+}
+
+@keyframes key-fade {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
