@@ -8,6 +8,7 @@ interface AppShellProps {
   onNavigate: (view: string) => void;
   userEmail?: string;
   onSignOut?: () => void;
+  isAdmin?: boolean;
 }
 
 export default function AppShell({
@@ -16,6 +17,7 @@ export default function AppShell({
   onNavigate,
   userEmail,
   onSignOut,
+  isAdmin = false,
 }: AppShellProps) {
 
   return (
@@ -74,6 +76,19 @@ export default function AppShell({
             >
               Cases
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => onNavigate("admin_signals")}
+                className={`px-3 py-1 rounded-lg text-xs font-sans transition-colors cursor-pointer ${
+                  activeView === "admin_signals"
+                    ? "bg-slate-100 border border-slate-200 text-slate-850 font-medium"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+                id="nav-admin-signals"
+              >
+                Signals
+              </button>
+            )}
           </nav>
 
           {/* User Session Metadata Badge */}

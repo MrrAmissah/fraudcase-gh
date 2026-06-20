@@ -100,6 +100,19 @@ function quickCheckEntities(redactedText: string): ExtractedEntities {
 const QUICK_CHECK_DISCLAIMER =
   "This quick result is AI-assisted and may be incomplete. It does not determine guilt, provide legal advice, or replace official investigation.";
 
+// --- Admin access control (Phase 4) ---
+// Comma-separated allowlist. Fail-closed: empty/unset means no admins (everyone denied).
+function getAdminEmails(): Set<string> {
+  return new Set(
+    (process.env.ADMIN_EMAILS || "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+const HIGH_RISK_THRESHOLD = 50; // aligns with getRiskLevel "High" boundary (>= 50)
+const ADMIN_REVIEW_STATUSES = ["pending", "reviewed", "false_positive", "useful"];
+
 // --- Community signal helpers (Phase 3): derive safe, masked metadata server-side ---
 function firstUrl(text: string): string | null {
   const m = text.match(/https?:\/\/[^\s]+/i);
@@ -211,6 +224,31 @@ async function startServer() {
       next();
     } catch (err: any) {
       console.error("Token verification failed:", err);
+      res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
+    }
+  }
+
+  // Admin guard: verify the Firebase ID token AND require the email to be allowlisted.
+  // 401 when unauthenticated/invalid token; 403 when authenticated but not an admin.
+  async function requireAdmin(req: any, res: any, next: any) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      res.status(401).json({ error: "Unauthorized: Missing Authorization header" });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(token);
+      const email = (decodedToken.email || "").toLowerCase();
+      if (!email || !getAdminEmails().has(email)) {
+        res.status(403).json({ error: "Forbidden: Admin access required." });
+        return;
+      }
+      req.user = { uid: decodedToken.uid, email: decodedToken.email };
+      next();
+    } catch (err: any) {
+      console.error("Admin token verification failed:", err);
       res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
   }
@@ -988,6 +1026,94 @@ async function startServer() {
     } catch (err: any) {
       console.error("Submit community signal error:", err);
       res.status(500).json({ error: "Could not submit the signal. Please try again." });
+    }
+  });
+
+  // --- ADMIN: Community Signals review (admin-only) ---
+
+  // Lightweight capability probe so the client can show/hide the admin link without
+  // leaking the allowlist. Requires auth; returns isAdmin for the signed-in user.
+  app.get("/api/admin/me", requireAuth, (req: any, res: any) => {
+    const email = (req.user.email || "").toLowerCase();
+    res.json({ isAdmin: getAdminEmails().has(email) });
+  });
+
+  // List redacted community signals with stats. In-memory filter/sort to avoid composite
+  // indexes (fine for MVP volume; move to aggregation/pagination at scale).
+  app.get("/api/admin/community-signals", requireAdmin, async (req: any, res: any) => {
+    try {
+      const snapshot = await adminDb.collection("communitySignals").get();
+      const all: any[] = [];
+      snapshot.forEach((doc) => all.push({ id: doc.id, ...doc.data() }));
+
+      const stats = {
+        total: all.length,
+        pending: all.filter((s) => s.reviewedStatus === "pending").length,
+        reviewed: all.filter((s) => s.reviewedStatus === "reviewed").length,
+        falsePositive: all.filter((s) => s.reviewedStatus === "false_positive").length,
+        useful: all.filter((s) => s.reviewedStatus === "useful").length,
+        highRisk: all.filter((s) => (s.riskScore || 0) >= HIGH_RISK_THRESHOLD).length,
+      };
+
+      let list = all;
+      const { status, category, minRiskScore, limit } = req.query;
+      if (typeof status === "string" && status) list = list.filter((s) => s.reviewedStatus === status);
+      if (typeof category === "string" && category) list = list.filter((s) => s.scamCategory === category);
+      if (minRiskScore !== undefined) {
+        const m = Number(minRiskScore);
+        if (!isNaN(m)) list = list.filter((s) => (s.riskScore || 0) >= m);
+      }
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      const lim = Math.min(Number(limit) || 100, 500);
+      list = list.slice(0, lim);
+
+      res.json({ stats, signals: list });
+    } catch (err: any) {
+      console.error("List community signals error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Update review fields only. redactedText is never accepted; no deletes in this phase.
+  app.patch("/api/admin/community-signals/:id", requireAdmin, async (req: any, res: any) => {
+    try {
+      const { id } = req.params;
+      const { reviewedStatus, adminNote, clusterId } = req.body || {};
+
+      const updates: any = {};
+      if (reviewedStatus !== undefined) {
+        if (!ADMIN_REVIEW_STATUSES.includes(reviewedStatus)) {
+          res.status(400).json({ error: "Invalid review status." });
+          return;
+        }
+        updates.reviewedStatus = reviewedStatus;
+      }
+      if (adminNote !== undefined) {
+        // Defensive: redact the admin note too — this collection never stores raw identifiers.
+        updates.adminNote = redactPIIAndSecrets(String(adminNote).slice(0, 1000)).redactedText;
+      }
+      if (clusterId !== undefined) {
+        updates.clusterId = clusterId === null ? null : String(clusterId).slice(0, 80);
+      }
+
+      if (Object.keys(updates).length === 0) {
+        res.status(400).json({ error: "No valid fields to update." });
+        return;
+      }
+      updates.updatedAt = new Date().toISOString();
+
+      const ref = adminDb.collection("communitySignals").doc(id);
+      const doc = await ref.get();
+      if (!doc.exists) {
+        res.status(404).json({ error: "Signal not found." });
+        return;
+      }
+      await ref.update(updates);
+      const updated = await ref.get();
+      res.json({ id: updated.id, ...updated.data() });
+    } catch (err: any) {
+      console.error("Update community signal error:", err);
+      res.status(500).json({ error: err.message });
     }
   });
 

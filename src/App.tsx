@@ -6,11 +6,13 @@ import NewCasePage from "./pages/NewCasePage";
 import CaseDetailPage from "./pages/CaseDetailPage";
 import ReportPage from "./pages/ReportPage";
 import QuickCheckPage from "./pages/QuickCheckPage";
+import AdminSignalsPage from "./pages/AdminSignalsPage";
 import AuthPage from "./pages/AuthPage";
 import { FraudCase } from "./types/fraudCase";
 import { EvidenceType } from "./types/evidence";
 import { QuickCheckResult } from "./types/quickCheck";
 import { getScamCategoryLabel } from "./lib/utils/risk";
+import { getAdminStatus } from "./lib/admin/adminClient";
 import { AlertCircle, RefreshCw } from "lucide-react";
 
 // Firebase imports
@@ -34,8 +36,11 @@ function AppContent() {
   const { user, loading: authLoading, signOut } = useAuth();
   
   const [activeView, setActiveView] = useState<
-    "landing" | "quick_check" | "dashboard" | "new_case" | "case_detail" | "report_preview"
+    "landing" | "quick_check" | "dashboard" | "new_case" | "case_detail" | "report_preview" | "admin_signals"
   >("landing");
+
+  // Admin status drives the (cosmetic) admin nav link; the server enforces access. Starts false.
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [cases, setCases] = useState<FraudCase[]>([]);
   const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
@@ -53,10 +58,12 @@ function AppContent() {
       (async () => {
         await fetchCases();
         await resumePendingQuickCheck();
+        setIsAdmin(await getAdminStatus()); // non-fatal; returns false on any error
       })();
     } else {
       setCases([]);
       setActiveCaseId(null);
+      setIsAdmin(false);
     }
   }, [user]);
 
@@ -430,17 +437,22 @@ function AppContent() {
           />
         );
 
+      case "admin_signals":
+        // Server enforces admin access; the page renders an access-denied state on 403.
+        return <AdminSignalsPage />;
+
       default:
         return <LandingPage onStart={() => setActiveView("dashboard")} />;
     }
   };
 
   return (
-    <AppShell 
-      activeView={activeView} 
+    <AppShell
+      activeView={activeView}
       onNavigate={handleNavigate}
       userEmail={user?.email || undefined}
       onSignOut={user ? signOut : undefined}
+      isAdmin={isAdmin}
     >
       {/* Global Toast for failures */}
       {apiError && (
