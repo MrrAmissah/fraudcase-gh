@@ -1,5 +1,5 @@
-import React from "react";
-import { ArrowLeft, Printer, Shield, ShieldCheck, AlertTriangle, Calendar, FileText, CheckSquare, MessageSquare, Link, Receipt, Image } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowLeft, Printer, Download, Loader2, Shield, ShieldCheck, AlertTriangle, Calendar, FileText, CheckSquare, MessageSquare, Link, Receipt, Image } from "lucide-react";
 import { FraudCase } from "../types/fraudCase";
 import { formatDate } from "../lib/utils/dates";
 import { getRiskLevel, getScamCategoryLabel } from "../lib/utils/risk";
@@ -13,9 +13,27 @@ interface ReportPreviewProps {
 export default function ReportPreview({ fraudCase, onBack }: ReportPreviewProps) {
   const { id, title, description, status, incidentDate, createdAt, evidenceItems, analysis } = fraudCase;
 
-  // Print function
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+
+  // Native print (kept available regardless of PDF generation).
   const triggerMockPDFDownload = () => {
     window.print();
+  };
+
+  // Direct, selectable PDF export. jsPDF + the generator are lazy-loaded on click.
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true);
+    setPdfError(null);
+    try {
+      const { generateReportPdf } = await import("../lib/pdf/generateReportPdf");
+      await generateReportPdf(fraudCase);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      setPdfError("Could not generate the PDF. You can still use Print to save a copy.");
+    } finally {
+      setPdfLoading(false);
+    }
   };
 
   if (!analysis) {
@@ -55,14 +73,32 @@ export default function ReportPreview({ fraudCase, onBack }: ReportPreviewProps)
           Edit Case
         </button>
 
-        <button
-          onClick={triggerMockPDFDownload}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 border border-cyan-500 hover:bg-cyan-700 text-white rounded-lg text-xs font-sans font-semibold tracking-normal transition-all cursor-pointer shadow-md"
-          id="report-print-btn"
-        >
-          <Printer size={14} />
-          Print / Save PDF Report
-        </button>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={triggerMockPDFDownload}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"
+              id="report-print-btn"
+            >
+              <Printer size={14} />
+              Print
+            </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={pdfLoading}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-cyan-600 border border-cyan-500 hover:bg-cyan-700 disabled:opacity-50 text-white rounded-lg text-xs font-sans font-semibold tracking-normal transition-all cursor-pointer shadow-md"
+              id="report-download-pdf-btn"
+            >
+              {pdfLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              {pdfLoading ? "Preparing…" : "Download PDF"}
+            </button>
+          </div>
+          {pdfError && (
+            <span className="text-[11px] text-red-600 font-sans font-medium" id="report-pdf-error">
+              {pdfError}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Main Dossier Report Page (A4 formatted styling block) */}
