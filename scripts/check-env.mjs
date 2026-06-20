@@ -7,7 +7,30 @@
  *   npm run check:env
  */
 import dotenv from "dotenv";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 dotenv.config();
+
+// Well-known location where `gcloud auth application-default login` writes local ADC.
+// CLOUDSDK_CONFIG overrides the gcloud config dir; otherwise it's platform-specific.
+// We only check for the file's existence — its contents are never read or printed.
+function adcWellKnownPath() {
+  const configDir =
+    process.env.CLOUDSDK_CONFIG ||
+    (process.platform === "win32"
+      ? path.join(process.env.APPDATA || path.join(os.homedir(), "AppData", "Roaming"), "gcloud")
+      : path.join(os.homedir(), ".config", "gcloud"));
+  return path.join(configDir, "application_default_credentials.json");
+}
+
+function fileExists(p) {
+  try {
+    return !!p && fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
 
 const groups = [
   {
@@ -30,12 +53,11 @@ const groups = [
     title: "Admin dashboard — optional (fail-closed: admin disabled if unset)",
     vars: ["ADMIN_EMAILS"],
   },
-  {
-    title: "Firebase Admin credentials — required for persistence (Firestore/Storage)",
-    vars: ["GOOGLE_APPLICATION_CREDENTIALS"],
-    note: "Alternatively use `gcloud auth application-default login` (ADC), which this check cannot detect.",
-  },
 ];
+
+// The Admin SDK accepts credentials from EITHER a service-account JSON path
+// (GOOGLE_APPLICATION_CREDENTIALS) OR local ADC from `gcloud auth application-default login`.
+// firebase-admin resolves these automatically, so the group is satisfied if either exists.
 
 const isSet = (name) => !!(process.env[name] && String(process.env[name]).trim());
 
@@ -52,6 +74,34 @@ for (const g of groups) {
     console.log(`  ${present ? "✓ present " : "○ not set "}  ${name}`);
   }
   if (g.note) console.log(`    note: ${g.note}`);
+  console.log("");
+}
+
+// Firebase Admin credentials — special-cased because either source satisfies it.
+{
+  console.log("Firebase Admin credentials — required for persistence (Firestore/Storage)");
+  const gacSet = isSet("GOOGLE_APPLICATION_CREDENTIALS");
+  const gacFileOk = gacSet && fileExists(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  const adcPath = adcWellKnownPath();
+  const adcOk = fileExists(adcPath);
+
+  console.log(
+    `  ${gacSet ? "✓ present " : "○ not set "}  GOOGLE_APPLICATION_CREDENTIALS (service-account JSON path)` +
+      (gacSet && !gacFileOk ? "  [warning: file not found at that path]" : "")
+  );
+  console.log(
+    `  ${adcOk ? "✓ present " : "○ not set "}  Local ADC at ${adcPath}`
+  );
+
+  const credentialsOk = gacFileOk || adcOk;
+  totalCount += 1;
+  if (credentialsOk) presentCount += 1;
+
+  if (credentialsOk) {
+    console.log(`    → credentials available via ${gacFileOk ? "service-account JSON" : "local ADC (gcloud)"}.`);
+  } else {
+    console.log("    → none detected. Run `gcloud auth application-default login` (ADC) or set GOOGLE_APPLICATION_CREDENTIALS.");
+  }
   console.log("");
 }
 
