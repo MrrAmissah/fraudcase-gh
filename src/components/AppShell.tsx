@@ -1,6 +1,5 @@
 import React from "react";
 import { Lock, AlertTriangle, HelpCircle, Terminal, User } from "lucide-react";
-import BrandLogo from "./BrandLogo";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -32,13 +31,13 @@ export default function AppShell({
 
       {/* Main Header navigation */}
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur-md sticky top-0 z-40" id="app-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-12 flex items-center justify-between">
-          <div 
-            onClick={() => onNavigate("landing")} 
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+          <div
+            onClick={() => onNavigate("landing")}
             className="flex items-center cursor-pointer group hover:opacity-90 transition-opacity"
             id="brand-logo"
           >
-            <BrandLogo variant="full" height={34} />
+            <img src="/brand/fraudcase-wordmark.png" alt="FraudCase GH" className="h-10 w-auto" />
           </div>
 
           {/* Navigation Links */}

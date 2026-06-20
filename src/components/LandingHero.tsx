@@ -1,165 +1,166 @@
 import React from "react";
 import { motion } from "motion/react";
-import { ShieldCheck, Database, FileSpreadsheet, AlertCircle, ArrowRight, Search, Info } from "lucide-react";
-import BrandLogo from "./BrandLogo";
+import { ShieldCheck, FileSpreadsheet, Search, ArrowRight, Upload, Lock, Sparkles, AlertCircle } from "lucide-react";
+import RiskGauge from "./analysis/RiskGauge";
 
 interface LandingHeroProps {
   onGetStarted: () => void;
   onQuickCheck?: () => void;
 }
 
+const STEPS = [
+  { n: 1, icon: Upload, title: "Paste or upload", body: "Drop in a suspicious SMS, WhatsApp message, link, or a text file. Sensitive data is redacted first." },
+  { n: 2, icon: Sparkles, title: "Get an instant risk signal", body: "AI-assisted indicators, a risk score, and extracted signals, all grounded in your evidence and never invented." },
+  { n: 3, icon: FileSpreadsheet, title: "Save & report", body: "Keep it in a private case, add more evidence, and export a clean PDF report when you're ready." },
+];
+
 export default function LandingHero({ onGetStarted, onQuickCheck }: LandingHeroProps) {
   return (
-    <div className="space-y-16 py-12" id="landing-hero-block">
-      {/* Title & Core Subtext CTA Section */}
-      <div className="text-center space-y-6 max-w-3xl mx-auto">
+    <div className="space-y-20 py-10" id="landing-hero-block">
+      {/* HERO — two columns: copy + product mockup */}
+      <div className="grid lg:grid-cols-2 gap-10 lg:gap-12 items-center max-w-6xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] text-slate-600 font-sans font-medium tracking-normal text-center shadow-xs"
-          id="hero-badge"
+          className="space-y-6 text-center lg:text-left"
         >
-          <span className="font-sans font-medium">Investigation Support Utility</span>
-        </motion.div>
+          <div className="inline-flex items-center px-3.5 py-1.5 bg-slate-50 border border-slate-200 rounded-full text-[11px] text-slate-600 font-sans font-medium shadow-xs">
+            Investigation support · no sign-up to start
+          </div>
 
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="text-[32px] sm:text-[40px] lg:text-[52px] font-bold text-slate-900 font-sans tracking-tight leading-tight"
-          id="hero-title"
-        >
-          Turn scattered scam evidence into a{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 font-sans">
-            structured case report
-          </span>.
-        </motion.h1>
+          <h1
+            className="text-[34px] sm:text-[42px] lg:text-[50px] font-bold text-slate-900 font-sans tracking-tight leading-[1.08]"
+            id="hero-title"
+          >
+            From scattered scam messages to a{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-600 to-blue-600">
+              clear case report
+            </span>
+            .
+          </h1>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="text-[15px] sm:text-[16px] text-slate-600 font-sans max-w-2xl mx-auto leading-relaxed"
-          id="hero-tagline"
-        >
-          Organize suspicious messages, links, receipts, and transaction details into a clear evidence timeline with AI-assisted risk indicators and report preparation.
-        </motion.p>
+          <p className="text-[15.5px] text-slate-600 font-sans max-w-xl mx-auto lg:mx-0 leading-relaxed">
+            Check a suspicious SMS, WhatsApp message, or link in seconds, then keep the evidence
+            organized, private, and report-ready.
+          </p>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="pt-4 space-y-4"
-          id="hero-cta-container"
-        >
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3 pt-1">
             {onQuickCheck && (
               <button
                 onClick={onQuickCheck}
-                className="group relative inline-flex items-center gap-2.5 px-8 py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-base font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer"
                 id="hero-quick-check-btn"
+                className="inline-flex items-center gap-2.5 px-7 py-3.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-[15px] font-semibold shadow-md border border-cyan-500 hover:scale-[1.02] transition-all duration-150 cursor-pointer"
               >
                 <Search size={18} />
-                Quick Check a Suspicious Message
-                <Info size={15} className="text-white/75" />
-                <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-3 w-64 px-3 py-2 bg-slate-800 text-white text-[11px] font-normal font-sans leading-normal rounded-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity z-20 shadow-lg text-center">
-                  No sign-up required — run an instant first scan before you decide to open a full case.
-                </span>
+                Quick Check a message
               </button>
             )}
             <button
               onClick={onGetStarted}
-              className="group inline-flex items-center gap-3 px-8 py-4 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-base font-semibold shadow-sm border border-slate-250 hover:border-slate-300 transition-all duration-150 cursor-pointer"
               id="hero-get-started-btn"
+              className="group inline-flex items-center gap-2 px-7 py-3.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-[15px] font-semibold shadow-sm border border-slate-250 hover:border-slate-300 transition-all duration-150 cursor-pointer"
             >
-              Open Evidence Dashboard
-              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              Open a private workspace
+              <ArrowRight size={17} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
+          <div className="flex items-center justify-center lg:justify-start gap-2 text-[11.5px] text-slate-500 font-sans">
+            <Lock size={12} className="text-cyan-600 flex-shrink-0" />
+            <span>Sensitive data is redacted before analysis. Quick Check stores nothing.</span>
+          </div>
+        </motion.div>
+
+        {/* Product mockup (static, illustrative) */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          className="relative"
+          id="hero-mockup"
+        >
+          <div className="absolute -inset-3 bg-gradient-to-br from-cyan-100/40 to-blue-100/30 rounded-3xl blur-xl" aria-hidden="true" />
+          <div className="relative bg-white border border-slate-200 rounded-2xl shadow-xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Search size={15} className="text-cyan-600" />
+                <span className="text-[12px] font-semibold text-slate-700 font-sans">Quick Check result</span>
+              </div>
+              <span className="px-2 py-0.5 text-[10px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded-md">
+                High risk
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <RiskGauge score={88} size={108} />
+              <div className="space-y-1.5 flex-grow">
+                <div className="text-[11px] text-slate-500 font-sans">Possible category</div>
+                <div className="text-[13px] font-semibold text-slate-800 font-sans leading-snug">
+                  Fake delivery / courier fee
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="px-2 py-0.5 text-[10px] bg-red-50 text-red-700 border border-red-200 rounded">
+                    Brand impersonation
+                  </span>
+                  <span className="px-2 py-0.5 text-[10px] bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                    Unofficial domain
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[11px] text-slate-500 font-sans">
+              <ShieldCheck size={13} className="text-cyan-600 flex-shrink-0" />
+              <span>
+                Sensitive details masked before analysis, e.g. <span className="font-mono">024***456</span>
+              </span>
+            </div>
+          </div>
         </motion.div>
       </div>
 
-      {/* Three Functional Value Proposition Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto" id="feature-grid">
-        {/* Feature 1 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all shadow-sm"
-          id="feature-card-1"
-        >
-          <div className="p-3 bg-cyan-50 border border-cyan-150 rounded-lg text-cyan-600 w-fit mb-4">
-            <Database size={20} />
-          </div>
-          <h3 className="text-[17px] font-semibold text-slate-800 tracking-tight font-sans mb-2">
-            1. Collect & Classify Evidence
-          </h3>
-          <p className="text-[15px] text-slate-600 leading-relaxed font-sans">
-            Paste suspicious WhatsApp chat export logs, SMS strings, transaction URLs, or Mobile Money references. Keep your records indexed in one structured folder.
+      {/* HOW IT WORKS — 3 steps */}
+      <div className="max-w-5xl mx-auto" id="how-it-works">
+        <div className="text-center mb-8">
+          <h2 className="text-[22px] font-bold text-slate-900 font-sans tracking-tight">How it works</h2>
+          <p className="text-[13.5px] text-slate-500 font-sans mt-1">
+            Three steps from a suspicious message to a clear report.
           </p>
-        </motion.div>
-
-        {/* Feature 2 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all shadow-sm"
-          id="feature-card-2"
-        >
-          <div className="p-3 bg-blue-50 border border-blue-150 rounded-lg text-blue-600 w-fit mb-4">
-            <ShieldCheck size={20} />
-          </div>
-          <h3 className="text-[17px] font-semibold text-slate-800 tracking-tight font-sans mb-2">
-            2. Analyze Risk Signals
-          </h3>
-          <p className="text-[15px] text-slate-600 leading-relaxed font-sans">
-            Utilize server-side Gemini intelligence models to identify common phishing, delivery-fee traps, Ponzi signals, and trace indicators without exposing secrets to the client.
-          </p>
-        </motion.div>
-
-        {/* Feature 3 */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="p-6 bg-white border border-slate-200 rounded-xl hover:shadow-md hover:border-slate-300 transition-all shadow-sm"
-          id="feature-card-3"
-        >
-          <div className="p-3 bg-indigo-50 border border-indigo-150 rounded-lg text-indigo-600 w-fit mb-4">
-            <FileSpreadsheet size={20} />
-          </div>
-          <h3 className="text-[17px] font-semibold text-slate-800 tracking-tight font-sans mb-2">
-            3. Export a Clean Case Report
-          </h3>
-          <p className="text-[15px] text-slate-600 leading-relaxed font-sans">
-            Review a structured investigation report. Save chronological event milestones, extracted targets, checklists, and safe operational guidelines in a professional layout.
-          </p>
-        </motion.div>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-5">
+          {STEPS.map((s) => (
+            <div key={s.n} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-cyan-600 text-white text-[11px] font-bold font-sans">
+                  {s.n}
+                </span>
+                <s.icon size={16} className="text-cyan-600" />
+              </div>
+              <h3 className="text-[15px] font-semibold text-slate-800 font-sans mb-1">{s.title}</h3>
+              <p className="text-[13px] text-slate-600 font-sans leading-relaxed">{s.body}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Large Legal Disclaimer Banner - Safety Framing */}
+      {/* AMBER SAFETY DISCLAIMER */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.7, delay: 0.5 }}
-        className="max-w-4xl mx-auto p-6 border border-amber-200 rounded-xl bg-amber-50/70 flex items-start gap-4 shadow-sm"
+        transition={{ duration: 0.6, delay: 0.3 }}
+        className="max-w-4xl mx-auto p-5 border border-amber-200 rounded-xl bg-amber-50/70 flex items-start gap-3.5 shadow-sm"
         id="legal-disclaimer-box"
       >
         <div className="text-amber-600 p-1.5 bg-amber-100 border border-amber-250 rounded-lg mt-0.5 flex-shrink-0">
-          <AlertCircle size={20} />
+          <AlertCircle size={18} />
         </div>
-        <div className="space-y-1">
-          <h4 className="text-amber-800 font-semibold text-[14px] font-sans">
-            Safety Disclaimer & Platform Guardrails
-          </h4>
-          <p className="text-[14px] text-slate-700 leading-relaxed font-sans font-normal">
-            <strong>FraudCase GH is an independent AI-assisted utility that organizes user-provided evidence details into clean chronological reports.</strong> It does not determine guilt, provide legal advice, or replace an official law-enforcement investigation. If you wish to file an official report, please contact your financial institution, telecom operator, or relevant official authorities directly.
-          </p>
-        </div>
+        <p className="text-[13.5px] text-slate-700 leading-relaxed font-sans">
+          <strong className="text-amber-800">FraudCase GH organizes user-provided evidence into clear reports.</strong>{" "}
+          It is AI-assisted decision support. It does not determine guilt, provide legal advice, or replace an
+          official investigation. To file an official report, contact your bank, telecom operator, or the relevant
+          authorities directly.
+        </p>
       </motion.div>
     </div>
   );

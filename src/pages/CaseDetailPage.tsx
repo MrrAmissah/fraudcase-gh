@@ -24,6 +24,7 @@ import ExtractedEntitiesTable from "../components/ExtractedEntitiesTable";
 import SuspiciousIndicators from "../components/SuspiciousIndicators";
 import TimelineView from "../components/TimelineView";
 import EvidenceChecklist from "../components/EvidenceChecklist";
+import AnalysisVisualSummary from "../components/analysis/AnalysisVisualSummary";
 
 interface CaseDetailPageProps {
   fraudCase: FraudCase;
@@ -413,7 +414,18 @@ export default function CaseDetailPage({
           ) : (
             /* Analyzed details modules */
             <div className="space-y-6" id="analysis-results-panel">
-              
+
+              {/* Executive-readable visual summary (pure rendering of the analysis fields below) */}
+              <AnalysisVisualSummary
+                riskScore={analysis.riskScore}
+                confidence={analysis.confidence}
+                scamCategory={analysis.scamCategory}
+                indicators={analysis.suspiciousIndicators}
+                entities={analysis.extractedEntities}
+                checklist={analysis.evidenceChecklist}
+                shortSummary={analysis.shortSummary}
+              />
+
               {/* Extracted Case Entities */}
               <ExtractedEntitiesTable entities={analysis.extractedEntities} />
 

@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import QuickCheckHero from "../components/QuickCheckHero";
 import QuickCheckInputPanel from "../components/QuickCheckInputPanel";
 import QuickCheckResultCard from "../components/QuickCheckResultCard";
-import { runQuickCheck, submitQuickCheckSignal } from "../lib/quickCheck/quickCheckClient";
+import { runQuickCheck, runQuickCheckFile, submitQuickCheckSignal } from "../lib/quickCheck/quickCheckClient";
 import { QuickCheckResult } from "../types/quickCheck";
 
 interface QuickCheckPageProps {
@@ -36,6 +36,21 @@ export default function QuickCheckPage({
       setResult(res);
     } catch (err: any) {
       setError(err.message || "Quick Check failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Public file upload (readable text only). The server validates, redacts, and analyzes the text
+  // ephemerally — nothing anonymous is stored. Images/PDFs come back as guidance, shown as `error`.
+  const handleAnalyzeFile = async (file: File) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await runQuickCheckFile(file);
+      setResult(res);
+    } catch (err: any) {
+      setError(err.message || "We couldn't read that file. Try pasting the message text instead.");
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +96,12 @@ export default function QuickCheckPage({
       {!result ? (
         <>
           <QuickCheckHero />
-          <QuickCheckInputPanel onAnalyze={handleAnalyze} isLoading={isLoading} error={error} />
+          <QuickCheckInputPanel
+            onAnalyze={handleAnalyze}
+            onAnalyzeFile={handleAnalyzeFile}
+            isLoading={isLoading}
+            error={error}
+          />
         </>
       ) : (
         <QuickCheckResultCard

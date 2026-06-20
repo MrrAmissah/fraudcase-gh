@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertCircle } from "lucide-react";
+import { classifyIndicatorSeverity } from "../lib/utils/indicatorSeverity";
 
 interface SuspiciousIndicatorsProps {
   indicators: string[];
@@ -8,19 +9,14 @@ interface SuspiciousIndicatorsProps {
 export default function SuspiciousIndicators({ indicators }: SuspiciousIndicatorsProps) {
   const getSeverityAndDetails = (text: string) => {
     const norm = text.toLowerCase();
-    let severity: "High" | "Medium" | "Low" = "Medium";
-    let badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-
-    if (norm.includes("critical") || norm.includes("urgent") || norm.includes("fake") || norm.includes("phish") || norm.includes("impersonat") || norm.includes("momo")) {
-      severity = "High";
-      badgeColor = "bg-red-50 text-red-700 border-red-200";
-    } else if (norm.includes("verify") || norm.includes("unclear") || norm.includes("missing") || norm.includes("request")) {
-      severity = "Medium";
-      badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-    }
-    // Unmatched indicators keep the initialized "Medium" severity. We deliberately do NOT default
-    // to "Low": indicator strings on real fraud (e.g. delivery/courier scams) often lack the high-
-    // risk trigger words above, and badging them "Low" understates the danger for the reader.
+    // Shared classifier (src/lib/utils/indicatorSeverity) — never defaults unmatched indicators to
+    // "Low", so real fraud signals that lack high-risk trigger words are not understated. The
+    // analysis visual summary's severity bars use the same classifier so the two never diverge.
+    const severity = classifyIndicatorSeverity(text);
+    const badgeColor =
+      severity === "High"
+        ? "bg-red-50 text-red-700 border-red-200"
+        : "bg-amber-50 text-amber-700 border-amber-200";
 
     // Ensure careful wording constraints
     let cleanedText = text

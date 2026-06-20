@@ -100,6 +100,41 @@ function quickCheckEntities(redactedText: string): ExtractedEntities {
 const QUICK_CHECK_DISCLAIMER =
   "This quick result is AI-assisted and may be incomplete. It does not determine guilt, provide legal advice, or replace official investigation.";
 
+// Shown when a user uploads an image/PDF to public Quick Check. There is no OCR/text extraction in
+// the public flow, so we guide the user rather than pretend deep document analysis exists.
+const PUBLIC_UPLOAD_TEXT_GUIDANCE =
+  "For best results, paste the visible message text. Full screenshot/document evidence can be saved inside a private case.";
+
+// Shared Quick Check pipeline used by BOTH the paste and file-upload endpoints so the
+// redaction/analysis logic lives in exactly one place. It redacts first, analyzes the REDACTED
+// text only, and returns an EPHEMERAL result — it writes nothing to Firestore, Storage, or disk.
+async function buildQuickCheckResult(rawText: string): Promise<QuickCheckResult> {
+  const input = rawText.slice(0, QC_MAX_INPUT_CHARS);
+
+  // 1. Redact BEFORE analysis — raw text is never sent to the AI and never stored.
+  const redaction = redactPIIAndSecrets(input);
+
+  // 2. Analyze the redacted text only (server-side Gemini; heuristic fallback if no key).
+  const analysis = await analyzeFraudCase("Quick Check submission", redaction.redactedText, []);
+
+  // 3. Build an ephemeral result. Nothing is written to Firestore/Storage/disk.
+  return {
+    quickCheckId: `qc-${Date.now()}`,
+    redactedText: redaction.redactedText,
+    scamCategory: analysis.scamCategory,
+    riskScore: analysis.riskScore,
+    confidence: analysis.confidence,
+    shortSummary: analysis.shortSummary,
+    possibleFraudIndicators: analysis.suspiciousIndicators || [],
+    extractedEntities: quickCheckEntities(redaction.redactedText),
+    redactionWarnings: redaction.redactionWarnings || [],
+    recommendedNextSteps: analysis.recommendedNextSteps || [],
+    saveAsCaseAvailable: true,
+    shareRedactedSignalAvailable: false,
+    disclaimer: QUICK_CHECK_DISCLAIMER,
+  };
+}
+
 // --- Admin access control (Phase 4) ---
 // Comma-separated allowlist. Fail-closed: empty/unset means no admins (everyone denied).
 function getAdminEmails(): Set<string> {
@@ -181,6 +216,34 @@ async function startServer() {
         if (err instanceof multer.MulterError) {
           if (err.code === "LIMIT_FILE_SIZE") {
             res.status(400).json({ error: "File exceeds the 10MB maximum upload size." });
+            return;
+          }
+          res.status(400).json({ error: `Upload rejected: ${err.message}` });
+          return;
+        }
+        res.status(400).json({ error: "Upload could not be processed." });
+        return;
+      }
+      next();
+    });
+  }
+
+  // Public Quick Check uploads use a STRICTER 5MB cap (vs 10MB for authenticated case evidence)
+  // and a single file. Bytes are held in memory only and processed ephemerally — never stored.
+  const MAX_PUBLIC_FILE_BYTES = 5 * 1024 * 1024; // 5MB public cap
+  const publicUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_PUBLIC_FILE_BYTES, files: 1 },
+  });
+
+  function publicUploadSingle(req: any, res: any, next: any) {
+    publicUpload.single("file")(req, res, (err: any) => {
+      if (err) {
+        if (err instanceof multer.MulterError) {
+          if (err.code === "LIMIT_FILE_SIZE") {
+            res.status(400).json({
+              error: "File exceeds the 5MB limit for Quick Check uploads. For larger evidence, save it inside a private case.",
+            });
             return;
           }
           res.status(400).json({ error: `Upload rejected: ${err.message}` });
@@ -926,35 +989,54 @@ async function startServer() {
         return;
       }
 
-      const input = text.slice(0, QC_MAX_INPUT_CHARS);
-
-      // 1. Redact BEFORE analysis — raw text is never sent to the AI and never stored.
-      const redaction = redactPIIAndSecrets(input);
-
-      // 2. Analyze the redacted text only (server-side Gemini; heuristic fallback if no key).
-      const analysis = await analyzeFraudCase("Quick Check submission", redaction.redactedText, []);
-
-      // 3. Build an ephemeral result. Nothing is written to Firestore/Storage/disk.
-      const result: QuickCheckResult = {
-        quickCheckId: `qc-${Date.now()}`,
-        redactedText: redaction.redactedText,
-        scamCategory: analysis.scamCategory,
-        riskScore: analysis.riskScore,
-        confidence: analysis.confidence,
-        shortSummary: analysis.shortSummary,
-        possibleFraudIndicators: analysis.suspiciousIndicators || [],
-        extractedEntities: quickCheckEntities(redaction.redactedText),
-        redactionWarnings: redaction.redactionWarnings || [],
-        recommendedNextSteps: analysis.recommendedNextSteps || [],
-        saveAsCaseAvailable: true, // CTA scaffolded for Phase 2 (no persistence yet)
-        shareRedactedSignalAvailable: false, // community signals = Phase 3
-        disclaimer: QUICK_CHECK_DISCLAIMER,
-      };
-
+      // Redact → analyze redacted text only → ephemeral result (shared with the upload endpoint).
+      const result = await buildQuickCheckResult(text);
       res.json(result);
     } catch (err: any) {
       console.error("Quick Check analyze error:", err);
       res.status(500).json({ error: "Could not complete the Quick Check. Please try again." });
+    }
+  });
+
+  // PUBLIC Quick Check file upload (no auth, rate-limited). Accepts READABLE TEXT files only
+  // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
+  // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
+  // handler intentionally has no Firestore/Storage/disk write path.
+  app.post("/api/quick-check/analyze-file", quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "Attach a .txt, .csv, .json, or .html file to run a Quick Check." });
+        return;
+      }
+
+      // Same allowlist + magic-byte validation used for authenticated case evidence. Rejects
+      // executables/scripts/macros and files renamed/disguised to slip past the browser allowlist.
+      const validation = validateUploadedFile(req.file.originalname, req.file.mimetype, req.file.buffer);
+      if (!validation.ok) {
+        res.status(400).json({ error: validation.error });
+        return;
+      }
+
+      // Only readable text is analyzable. Images/PDFs are valid evidence but need OCR we do not
+      // have, so guide the user rather than fabricate an analysis.
+      if (!validation.isReadableText) {
+        res.status(415).json({ error: PUBLIC_UPLOAD_TEXT_GUIDANCE, guidance: true });
+        return;
+      }
+
+      // Read bytes as UTF-8 text. HTML is treated as plain text — it is never parsed or rendered.
+      const rawText = req.file.buffer.toString("utf-8");
+      if (!rawText.trim()) {
+        res.status(400).json({ error: "That file contained no readable text to check." });
+        return;
+      }
+
+      // Identical ephemeral pipeline as the paste flow: redact → analyze redacted text → return.
+      const result = await buildQuickCheckResult(rawText);
+      res.json(result);
+    } catch (err: any) {
+      console.error("Quick Check upload analyze error:", err);
+      res.status(500).json({ error: "Could not complete the Quick Check upload. Please try again." });
     }
   });
 

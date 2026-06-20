@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="public/brand/fraudcase-wordmark.png" alt="FraudCase GH" width="360" />
+</div>
+
 # FraudCase GH
 
 > A privacy-first web app that helps people in Ghana organize digital-scam evidence, understand the risk, and produce a clean, non-accusatory incident report — without doxxing, shaming, or declaring anyone guilty.
