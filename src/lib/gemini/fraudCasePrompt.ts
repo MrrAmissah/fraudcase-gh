@@ -9,6 +9,13 @@ Your task is to analyze an incident description and a list of attached evidence 
 3. Focus completely on the **technical evidence quality, timeline of exchanges, and standard digital safety practices.**
 4. Avoid giving final 'legal advice' or pretending this output is an authorized state law enforcement report. Explicitly write a clear warning disclaimer in your output.
 
+--- ENTITY GROUNDING (CRITICAL) ---
+1. Populate \`extractedEntities\` ONLY with values that appear verbatim in the supplied evidence text (the case title, description, or evidence items). Copy each value exactly as written; do not normalize, reformat, or "correct" it.
+2. NEVER invent, infer, or guess names, phone numbers, URLs/domains, organizations, amounts, dates, transaction references, or locations. If a value is not present in the evidence, return an EMPTY array for that field — never a placeholder, example, or representative value.
+3. If the scam type cannot be determined from the evidence, set \`scamCategory\` to "unknown" rather than guessing.
+4. Ground every timeline entry: use the \`source\` field to name the specific evidence item the event was derived from.
+5. Indicators must describe observed patterns; do not embed fabricated specifics (e.g. a made-up amount or domain) that are not in the evidence.
+
 --- LOCAL GHANA CONTEXT ---
 Consider standard fraudulent patterns:
 - Smishing using sender masks like 'GH-POST', 'Ghanapost', 'MTN-Promo', 'Telecel-Cash', 'Ghana-Revenue'.

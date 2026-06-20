@@ -17,10 +17,10 @@ export default function SuspiciousIndicators({ indicators }: SuspiciousIndicator
     } else if (norm.includes("verify") || norm.includes("unclear") || norm.includes("missing") || norm.includes("request")) {
       severity = "Medium";
       badgeColor = "bg-amber-50 text-amber-700 border-amber-200";
-    } else {
-      severity = "Low";
-      badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
     }
+    // Unmatched indicators keep the initialized "Medium" severity. We deliberately do NOT default
+    // to "Low": indicator strings on real fraud (e.g. delivery/courier scams) often lack the high-
+    // risk trigger words above, and badging them "Low" understates the danger for the reader.
 
     // Ensure careful wording constraints
     let cleanedText = text

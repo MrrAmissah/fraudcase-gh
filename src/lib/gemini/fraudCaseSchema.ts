@@ -26,6 +26,8 @@ export const fraudCaseSchema = {
     },
     extractedEntities: {
       type: Type.OBJECT,
+      description:
+        "Entities copied verbatim from the evidence text ONLY. Never invent, infer, or normalize values. If a field has no value present in the evidence, return an empty array for it.",
       properties: {
         phoneNumbers: { type: Type.ARRAY, items: { type: Type.STRING } },
         urls: { type: Type.ARRAY, items: { type: Type.STRING } },

@@ -4,15 +4,17 @@ import { FRAUD_CASE_PROMPT } from "./fraudCasePrompt";
 import { EvidenceItem } from "../../types/evidence";
 import { FraudAnalysis } from "../../types/analysis";
 
-// Ensure process.env is searchable
-const apiKey = process.env.GEMINI_API_KEY;
+// Server-side Gemini model id. Centralised so it can be verified/swapped in one place and named in logs.
+const GEMINI_MODEL = "gemini-3.5-flash";
 
-// Initialize GoogleGenAI client lazily to avoid startup crashes if key is initially absent
+// Initialize GoogleGenAI client lazily. IMPORTANT: the key is read at CALL TIME (not at module load)
+// so analysis works regardless of when dotenv.config() runs relative to this module being imported.
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!aiClient && apiKey) {
     aiClient = new GoogleGenAI({
-      apiKey: apiKey,
+      apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
@@ -53,9 +55,9 @@ export async function analyzeFraudCase(
       .replace("${caseDescription}", caseDescription)
       .replace("${evidenceText}", evidenceText);
 
-    // Call Gemini 3.5 Flash server-side
+    // Call Gemini server-side
     const response = await client.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: GEMINI_MODEL,
       contents: fullPrompt,
       config: {
         responseMimeType: "application/json",
@@ -71,17 +73,27 @@ export async function analyzeFraudCase(
 
     const parsed = JSON.parse(textOutput) as FraudAnalysis;
     return parsed;
-  } catch (error) {
-    console.error("Gemini analysis failed or returned invalid JSON. Error:", error);
-    // Provide a safe, rich mock fallback on failure
+  } catch (error: any) {
+    // Surface the real Gemini/model error clearly in development — never silently mask it.
+    console.error(
+      `Gemini analysis failed (model="${GEMINI_MODEL}") — falling back to heuristic. Reason:`,
+      error?.message || error
+    );
     return generateHeuristicMockAnalysis(caseTitle, caseDescription, evidenceItems);
   }
 }
 
 /**
- * Heuristics-based fallback generator for offline-first operation or missing keys
+ * Heuristics-based fallback generator for offline-first operation or missing keys.
+ *
+ * Grounding rule: entities are extracted ONLY from the supplied evidence text. This function never
+ * invents names, domains, phone numbers, organizations, amounts, or locations — when a value is
+ * absent from the evidence, its list stays empty. Indicator strings are pattern descriptions and
+ * deliberately avoid embedding any specific (fabricated) value.
+ *
+ * Exported for unit testing of analysis quality.
  */
-function generateHeuristicMockAnalysis(
+export function generateHeuristicMockAnalysis(
   title: string,
   description: string,
   evidence: EvidenceItem[]
@@ -104,9 +116,9 @@ function generateHeuristicMockAnalysis(
     score = 85;
     summary = "Attributes heavily align with unauthorized postal/courier impersonation scams. These exploit urgency by claiming a low-value parcel is pending custom fee clearances.";
     indicators = [
-      "Unexpected SMS notification originating from masked ID representing a delivery brand.",
-      "Requires small payment (GHS 12.50) using unauthenticated domains to release cargo.",
-      "The link points to a foreign country-level suffix (.cz / .icu) irrelevant to local courier systems."
+      "Unexpected delivery/courier SMS from a masked sender ID impersonating a postal brand.",
+      "Requests a small upfront 'clearance' or 're-delivery' fee through a web link to release a parcel.",
+      "Payment link relies on an unofficial domain with no operational relationship to a legitimate local courier."
     ];
     recommendedSteps = [
       "DO NOT fill custom address grids or MoMo credentials on web references linked in standard text messages.",
@@ -119,9 +131,9 @@ function generateHeuristicMockAnalysis(
     score = 75;
     summary = "Patterns match online high-yield task recruitment fraud where victims are enticed to like social feeds for GHS commissions, but must submit deposits first.";
     indicators = [
-      "Job solicitation from overseas numbers via WhatsApp/Telegram without a formal interview/background check.",
-      "Demands GHS 100 registration or 'level-up' upgrade deposit in exchange for subsequent task payouts.",
-      "Uses suspicious unofficial domains (.icu, .online) to list employee stats."
+      "Unsolicited job/task offer via WhatsApp/Telegram without any formal interview or background check.",
+      "Demands an upfront registration or 'level-up' deposit in exchange for promised task payouts.",
+      "Directs to an unofficial domain to display fabricated employee or earnings statistics."
     ];
     recommendedSteps = [
       "Do not send money or deposits in order to receive job compensation. This is a primary hallmark of structural advance-fee fraud.",
@@ -152,39 +164,24 @@ function generateHeuristicMockAnalysis(
     ];
   }
 
-  // Extract dummy entities
-  const phoneNumbers: string[] = [];
-  const urls: string[] = [];
-  const amounts: string[] = [];
-  const transactionReferences: string[] = [];
+  // Extract entities ONLY from the supplied evidence text (title + description + each evidence
+  // item), reading the same redacted-first text the categorizer uses. Nothing is invented: absent
+  // values simply stay empty. No category-based fillers, placeholder numbers, or default domains.
+  const uniq = (arr: string[]) => Array.from(new Set(arr));
+  const corpus = [
+    title,
+    description,
+    ...evidence.map(e => e.redactedText || e.originalText || ""),
+  ].join("\n");
+
+  const phoneNumbers = uniq(corpus.match(/0[235]\d{8}/g) || []);
+  const urls = uniq((corpus.match(/https?:\/\/[^\s]+/g) || []).map(u => u.replace(/[",.)]+$/g, "")));
+  const amounts = uniq(corpus.match(/GHS\s*\d+(?:\.\d{2})?/gi) || []);
+
+  // Names, organizations, and locations are left empty: the heuristic cannot reliably extract them
+  // from free text, and guessing would fabricate entities. Gemini (when available) fills these in.
   const organizations: string[] = [];
-
-  // Very basic extraction logic
-  const originalNumbers = title.match(/0[235]\d{8}/g) || description.match(/0[235]\d{8}/g) || [];
-  originalNumbers.forEach(n => {
-    if (!phoneNumbers.includes(n)) phoneNumbers.push(n);
-  });
-  
-  const originalUrls = description.match(/https?:\/\/[^\s]+/g) || [];
-  originalUrls.forEach(u => {
-    const trimmed = u.replace(/[",.)]/g, "");
-    if (!urls.includes(trimmed)) urls.push(trimmed);
-  });
-
-  const originalAmounts = description.match(/GHS\s*\d+(\.\d{2})?/gi) || [];
-  originalAmounts.forEach(a => {
-    if (!amounts.includes(a)) amounts.push(a);
-  });
-
-  // Default entity fillers if none found
-  if (phoneNumbers.length === 0) phoneNumbers.push("0240000000");
-  if (urls.length === 0 && category === "fake_delivery") urls.push("https://ghana-post-clearance.cz/pay-fee");
-  if (amounts.length === 0 && category === "fake_delivery") amounts.push("GHS 12.50");
-  if (organizations.length === 0) {
-    if (category === "fake_delivery") organizations.push("Ghana Post", "GH-POST");
-    else if (category === "fake_investment") organizations.push("Apex Digital Media");
-    else organizations.push("External Agent");
-  }
+  const transactionReferences: string[] = [];
 
   // Map to checklist
   const timeline = [
@@ -195,24 +192,12 @@ function generateHeuristicMockAnalysis(
     }
   ];
 
-  evidence.forEach((ev, idx) => {
+  evidence.forEach((ev) => {
     timeline.push({
       date: ev.createdAt.split("T")[0],
       event: `Registered evidence segment: ${ev.title}`,
       source: ev.type
     });
-    
-    // Add extra matches (use the same redacted-first text the categorizer reads).
-    const evText = ev.redactedText || ev.originalText;
-    if (evText) {
-      const extraNums = evText.match(/0[235]\d{8}/g) || [];
-      extraNums.forEach(n => { if (!phoneNumbers.includes(n)) phoneNumbers.push(n); });
-      const extraUrls = evText.match(/https?:\/\/[^\s]+/g) || [];
-      extraUrls.forEach(u => {
-        const trimmed = u.replace(/[",.)]/g, "");
-        if (!urls.includes(trimmed)) urls.push(trimmed);
-      });
-    }
   });
 
   const evidenceChecklist: FraudAnalysis["evidenceChecklist"] = [
@@ -262,12 +247,13 @@ function generateHeuristicMockAnalysis(
     extractedEntities: {
       phoneNumbers,
       urls,
-      names: ["Sarah", "Unknown Caller"],
+      names: [],
       organizations,
       amounts,
-      dates: [new Date().toISOString().split("T")[0]],
+      // Evidence-derived capture timestamps only — never a synthesized "today".
+      dates: uniq(evidence.map(e => e.createdAt.split("T")[0])),
       transactionReferences,
-      locations: ["Accra, Ghana"]
+      locations: []
     },
     timeline,
     evidenceChecklist,
