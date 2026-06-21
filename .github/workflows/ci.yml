@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-lint-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Environment template check
+        run: npm run check:env
+
+      - name: Secret pattern scan (tracked files)
+        run: |
+          set -e
+          if git grep -nI -E 'BEGIN PRIVATE KEY|private_key_id' -- . ':!docs/**' ':!src/lib/security/redaction.ts'; then
+            echo "Possible private key material found in tracked files."
+            exit 1
+          fi
+          if git ls-files | grep -E '^\.env$|service-account.*\.json$|firebase-adminsdk.*\.json$'; then
+            echo "Forbidden credential files are tracked."
+            exit 1
+          fi
+          echo "Secret pattern scan passed."
