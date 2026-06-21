@@ -30,7 +30,7 @@ Legend: **S1** Sprint 1 · **S2** Sprint 2 · **S3** Sprint 3 · **S4** Sprint 4
 |---|---|---|
 | Firebase Auth protects all private routes | Done | Anonymous → 401 |
 | Server-side ID token verification | Done | Invalid token → 401 |
-| `ownerId` isolation on all case/evidence routes | Done | Automated regression tests |
+| `ownerId` isolation on all case/evidence routes | S6 | Helper-level regression tests added now; route-level isolation tests and deployed Firestore/Storage rules verification still required before launch |
 | `ownerId` never accepted from client for authz | Done | Update/transfer attempts fail |
 | Admin routes require allowlist + token | Done | Non-admin → 403 |
 | Admin review protected and auditable | S5 | Audit log entries without PII |
