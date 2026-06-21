@@ -4,11 +4,15 @@
 
 # FraudCase GH
 
-> A privacy-first web app that helps people in Ghana organize digital-scam evidence, understand the risk, and produce a clean, non-accusatory incident report — without doxxing, shaming, or declaring anyone guilty.
+> A privacy-first web app that helps people in Ghana organize digital-scam evidence, understand the risk, and produce a clean, non-accusatory incident report, without doxxing, shaming, or declaring anyone guilty.
 
 FraudCase GH turns a confusing pile of suspicious SMS, WhatsApp messages, links, and Mobile Money receipts into a structured case file with an AI-assisted risk assessment, extracted evidence entities, a timeline, an evidence checklist, and a downloadable PDF report suitable for sharing with a bank, mobile-money operator, or the National Cyber Security Authority.
 
-> **Note on positioning:** This is a portfolio project demonstrating full-stack engineering, applied AI, and security/privacy design. It is a decision-support and evidence-organization tool — **not** a law-enforcement system and **not** a verdict on any person.
+> **Note on positioning:** This is a portfolio project demonstrating full-stack engineering, applied AI, and security/privacy design. It is a decision-support and evidence-organization tool, **not** a law-enforcement system and **not** a verdict on any person.
+
+<div align="center">
+  <img src="docs/screenshots/landing.png" alt="FraudCase GH landing page" width="900" />
+</div>
 
 ---
 
@@ -174,19 +178,11 @@ No secret values are shown here. See `.env.example` for the template. Real value
 
 ## Screenshots
 
-> _Placeholder — add images to `docs/screenshots/` and link them here._
+### Landing page
 
-| View | Screenshot |
-|---|---|
-| Landing / Quick Check | `docs/screenshots/quick-check.png` |
-| Quick Check result | `docs/screenshots/quick-check-result.png` |
-| Case dashboard | `docs/screenshots/case-dashboard.png` |
-| Case detail + analysis | `docs/screenshots/case-detail.png` |
-| Extracted entities & indicators | `docs/screenshots/analysis.png` |
-| PDF report | `docs/screenshots/pdf-report.png` |
-| Admin community signals | `docs/screenshots/admin-signals.png` |
+![FraudCase GH landing page](docs/screenshots/landing.png)
 
-<!-- Example: ![Quick Check](docs/screenshots/quick-check.png) -->
+_More views (Quick Check result, case detail, analysis, PDF report, admin signals) live in `docs/screenshots/` and can be added here._
 
 ---
 
