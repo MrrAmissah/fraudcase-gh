@@ -8,7 +8,7 @@
 
 FraudCase GH turns a confusing pile of suspicious SMS, WhatsApp messages, links, and Mobile Money receipts into a structured case file with an AI-assisted risk assessment, extracted evidence entities, a timeline, an evidence checklist, and a downloadable PDF report suitable for sharing with a bank, mobile-money operator, or the National Cyber Security Authority.
 
-> **Note on positioning:** This is a portfolio project demonstrating full-stack engineering, applied AI, and security/privacy design. It is a decision-support and evidence-organization tool, **not** a law-enforcement system and **not** a verdict on any person.
+> **Note on positioning:** FraudCase GH is a **production-grade fraud evidence and investigation platform** for Ghana — a decision-support and evidence-organization tool, **not** a law-enforcement system and **not** a verdict on any person. Operational requirements live in [`docs/PRODUCTION_PLAN.md`](docs/PRODUCTION_PLAN.md).
 
 <div align="center">
   <img src="docs/screenshots/landing.png" alt="FraudCase GH landing page" width="900" />
@@ -208,30 +208,47 @@ A manual end-to-end QA checklist lives in [`docs/MANUAL_E2E_QA.md`](docs/MANUAL_
 - **Heuristic fallback is coarse.** Without Gemini, categorization is keyword-based; it is intentionally conservative and never fabricates entities, but it is less nuanced than the model.
 - **Per-indicator severity is heuristic.** Indicator badges are derived from text keywords; the **overall risk score** is the authoritative signal.
 - **Local-dev storage fallback.** In environments without Cloud Storage credentials, uploads fall back to a clearly-marked local directory (`provider=local-dev`) — intended for development only.
-- **Security rules not in repo.** Authorization is enforced server-side (token + `ownerId`); Firestore/Storage security rules as defense-in-depth are on the roadmap. The client SDK config is public by design.
-- **Automated coverage is focused.** Tests target analysis quality (the heuristic/grounding); broader end-to-end testing is currently manual.
-- **Not load/scale tested.** This is a portfolio-scale project, not a production deployment.
+- **Security rules in repo.** `firestore.rules` is checked in; Storage rules are documented in [`docs/STORAGE_RULES.md`](docs/STORAGE_RULES.md). Deploy both for defense-in-depth alongside server-side checks.
+- **Automated coverage is growing.** CI runs lint, test, and build; owner-isolation and analysis-quality tests are in place. Full E2E is on the production roadmap ([`docs/PRODUCTION_DEFINITION_OF_DONE.md`](docs/PRODUCTION_DEFINITION_OF_DONE.md)).
+- **Production hardening in progress.** App Check, shared rate limiting, WAF, and multimodal evidence extraction are sequenced in [`docs/PRODUCTION_PLAN.md`](docs/PRODUCTION_PLAN.md).
 
 ---
 
 ## Roadmap
 
-- Firestore & Cloud Storage **security rules** as defense-in-depth.
-- **Signed URLs** for time-limited evidence-file access.
-- More robust, multi-language entity extraction (e.g. Twi/Pidgin phrasing).
-- Case **collaboration / scoped sharing** with banks or responders.
-- Optional **reporting integrations** (e.g. NCA shortcode 292) — currently guidance only.
-- **Automated E2E tests** in CI.
+See [`docs/PRODUCTION_PLAN.md`](docs/PRODUCTION_PLAN.md) for the full phased roadmap. Highlights:
+
+- **Sprint 1 (current):** CI/security gates, production docs, owner-isolation regression tests
+- **Sprint 2:** App Check, shared rate limiter, WAF guidance, audit logging
+- **Sprint 3–4:** Private multimodal screenshot/PDF extraction with consent, redaction, and verification UI
+- **Sprint 5–6:** Report maturity, admin audit, E2E/abuse tests, public launch checklist
+
+Additional product goals:
+
+- Signed URLs for time-limited evidence-file access
+- More robust, multi-language entity extraction (e.g. Twi/Pidgin phrasing)
+- Case collaboration / scoped sharing with banks or responders
+- Optional reporting integrations (e.g. NCA shortcode 292) — currently guidance only
 
 ---
 
 ## Further documentation
 
-- [`docs/PORTFOLIO_CASE_STUDY.md`](docs/PORTFOLIO_CASE_STUDY.md) — the story, product thinking, and decisions behind the project.
-- [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) — components and request flows.
-- [`docs/SECURITY_PRIVACY_OVERVIEW.md`](docs/SECURITY_PRIVACY_OVERVIEW.md) — the security & privacy model in depth.
-- [`docs/ENV_SETUP.md`](docs/ENV_SETUP.md) — environment & credentials setup details.
+### Production (source of truth)
+
+- [`docs/PRODUCTION_PLAN.md`](docs/PRODUCTION_PLAN.md) — architecture, threat model, roadmap
+- [`docs/AGENT_PLAYBOOK.md`](docs/AGENT_PLAYBOOK.md) — agent operating rules
+- [`docs/PRODUCTION_DEFINITION_OF_DONE.md`](docs/PRODUCTION_DEFINITION_OF_DONE.md) — launch criteria
+- [`docs/PRODUCTION_ENV_CHECKLIST.md`](docs/PRODUCTION_ENV_CHECKLIST.md) — deploy checklist
+- [`docs/research/README.md`](docs/research/README.md) — advisory research imports
+
+### Architecture & security
+
+- [`docs/PORTFOLIO_CASE_STUDY.md`](docs/PORTFOLIO_CASE_STUDY.md) — product story and design decisions
+- [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) — components and request flows
+- [`docs/SECURITY_PRIVACY_OVERVIEW.md`](docs/SECURITY_PRIVACY_OVERVIEW.md) — security & privacy model
+- [`docs/ENV_SETUP.md`](docs/ENV_SETUP.md) — environment & credentials setup
 
 ---
 
-_FraudCase GH is an educational/portfolio project. It does not provide legal advice and is not affiliated with any government agency or law-enforcement authority._
+_FraudCase GH does not provide legal advice and is not affiliated with any government agency or law-enforcement authority. Roadmap informed by external research notes, including Google AI Studio; final design, validation, and implementation are maintained in-repo._
