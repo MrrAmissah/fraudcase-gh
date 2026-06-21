@@ -37,9 +37,15 @@ Pre-launch review for FraudCase GH. Pair with [`ENV_SETUP.md`](./ENV_SETUP.md) a
 - [ ] `ADMIN_EMAILS` set to the real reviewer list; verify a non-admin gets 403 and no admin UI.
 - [ ] (Plan) migrate from email allowlist to custom-claim roles (`admin: true`).
 
-## Rate limiting / App Check — TODO
-- [ ] Replace in-memory per-IP limiters (Quick Check analyze + signal submit) with a durable store.
-- [ ] Add **Firebase App Check** / CAPTCHA to public endpoints (`/api/quick-check/*`).
+## Rate limiting / App Check
+In-app, best-effort controls are now on the public `/api/quick-check/*` endpoints: `getClientIp` ignores
+the spoofable `X-Forwarded-For` unless `TRUST_PROXY=true`; per-IP daily caps; short-window burst caps
+(analyze 5/5min, file 3/5min, signal 5/10min); a 1MB body cap on public text endpoints; calm JSON errors.
+These are in-memory, per-instance, and only as good as the client IP. Still required for production:
+- [ ] Replace the in-memory limiters with a durable/shared store (e.g. Redis) for multi-instance.
+- [ ] Add **Firebase App Check** / CAPTCHA (Turnstile/reCAPTCHA) to public endpoints (`/api/quick-check/*`).
+- [ ] Add a **platform WAF / rate rules** in front of the service; set `TRUST_PROXY=true` so limiters see real IPs.
+- [ ] Add **Gemini quota + billing alerts** so cost abuse is capped and noticed.
 - [ ] Add rate limiting + audit logging to admin routes.
 
 ## Known limitations

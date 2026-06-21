@@ -103,11 +103,32 @@ The system is designed to avoid defamation and harm.
 - Uploads are received in-memory via `multer` and passed through `validateUploadedFile` before being stored.
 - Stored files are namespaced per user and served only through the ownership-checked download endpoint.
 
+## Public endpoint abuse controls (Quick Check)
+
+The three no-auth Quick Check endpoints (`analyze`, `analyze-file`, `submit-signal`) have layered, in-app abuse controls. They reduce casual scripted abuse but are **best-effort, not abuse-proof**.
+
+- **Request size.** Public text endpoints reject bodies over **1MB** early via `Content-Length` (the analysis itself only uses the first 5000 characters). Public file uploads stay capped at **5MB**, single file, in-memory, never stored.
+- **Client IP.** The limiters key on a `getClientIp(req)` helper that trusts `X-Forwarded-For` **only** when `TRUST_PROXY=true` (running behind a known proxy). By default the header is ignored and the socket address is used, so a script cannot rotate fake `X-Forwarded-For` values to dodge limits in local/dev.
+- **Daily caps.** ~15 analyze and 10 signal submissions per client per day.
+- **Short-window burst caps.** analyze 5 per 5 min, file analyze 3 per 5 min, signal 5 per 10 min. Exceeding any returns a calm `429`.
+- All public errors are returned as calm JSON, never stack traces.
+
+**These controls are in-memory, per-instance, and only as trustworthy as the client IP.** They are not a substitute for platform controls. Production should add:
+
+- **Firebase App Check** on the public endpoints (attestation that calls come from the real app).
+- A **CAPTCHA** (Turnstile / reCAPTCHA / hCaptcha) on the public Quick Check form.
+- A **platform WAF / rate rules** in front of the service (e.g. Vercel Firewall, Cloud Armor), with `TRUST_PROXY=true` so the limiter sees real client IPs.
+- **Gemini quota and billing alerts** so cost abuse is capped and noticed.
+- A shared rate-limit store (e.g. Redis) if more than one instance runs.
+
+We do not claim the public endpoint is abuse-proof.
+
 ---
 
 ## Known limitations & honest caveats
 
 - **Server-side enforcement is the primary control.** Firestore/Storage **security rules** as defense-in-depth are not yet in the repo (roadmap). A misconfigured client SDK alone should not be relied on for authorization — the server checks are what enforce isolation.
+- **Public anti-abuse is best-effort.** The in-app rate and size limits on the no-auth Quick Check endpoints reduce casual scripted abuse but are in-memory and bypassable behind spoofed proxies. Production controls (App Check, CAPTCHA, WAF, billing alerts) are required; see "Public endpoint abuse controls" above.
 - **Dev-only local storage fallback.** When Cloud Storage credentials are absent, evidence is written to a local directory marked `provider=local-dev`. This is for development only and is clearly logged.
 - **Redaction is pattern-based.** `redactPIIAndSecrets` uses regex heuristics; it covers common Ghanaian PII/secret formats but is not a guarantee against every possible sensitive string. Users are also prompted to avoid pasting raw credentials.
 - **Heuristic fallback is conservative, not clever.** When Gemini is unavailable, categorization is keyword-based — intentionally non-fabricating, but coarser than the model.

@@ -25,21 +25,35 @@ const HOST = "0.0.0.0";
 const QC_DAILY_LIMIT = 15; // anonymous analyze scans per IP per day
 const SIGNAL_DAILY_LIMIT = 10; // anonymous community-signal submissions per IP per day
 const QC_MAX_INPUT_CHARS = 5000; // public input length cap
+const PUBLIC_JSON_MAX_BYTES = 1 * 1024 * 1024; // 1MB cap for public text endpoints (analyze, submit-signal)
 
-// Best-effort per-IP daily limiter for public endpoints. NOTE: x-forwarded-for is
-// client-spoofable, so this is a scaffold only — App Check / CAPTCHA is the real control
-// (tracked in docs/QUICK_CHECK_TODO.md).
+// Trust the X-Forwarded-For header for the client IP ONLY when explicitly running behind a known
+// proxy (set TRUST_PROXY=true in production). Otherwise the header is client-spoofable, so we ignore
+// it and use the socket address. This stops a local/dev script from rotating fake IPs to dodge limits.
+const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+
+function getClientIp(req: any): string {
+  let ip = "";
+  if (TRUST_PROXY) {
+    ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  }
+  if (!ip) {
+    ip = req.socket?.remoteAddress || req.ip || "unknown";
+  }
+  // Normalize: strip the IPv6-mapped IPv4 prefix and lowercase so one client maps to one bucket.
+  return String(ip).replace(/^::ffff:/i, "").trim().toLowerCase() || "unknown";
+}
+
+// Best-effort per-IP DAILY limiter for public endpoints. In-app and only as trustworthy as the
+// client IP, so it is a scaffold: App Check / CAPTCHA / a platform WAF are the real controls
+// (see docs/QUICK_CHECK_TODO.md and docs/SECURITY_PRIVACY_OVERVIEW.md).
 function makeDailyRateLimit(
   store: Map<string, { count: number; day: string }>,
   limit: number,
   overLimitMessage: string
 ) {
   return function (req: any, res: any, next: any) {
-    const ip = String(
-      String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
-        req.socket?.remoteAddress ||
-        "unknown"
-    );
+    const ip = getClientIp(req);
     const today = new Date().toISOString().slice(0, 10);
     const entry = store.get(ip);
 
@@ -63,6 +77,38 @@ function makeDailyRateLimit(
   };
 }
 
+// Short-window BURST limiter (fixed window) layered on top of the daily cap to blunt rapid scripted
+// floods. Same best-effort caveat as the daily limiter; in-memory per instance.
+function makeBurstRateLimit(
+  store: Map<string, { count: number; windowStart: number }>,
+  limit: number,
+  windowMs: number,
+  overLimitMessage: string
+) {
+  return function (req: any, res: any, next: any) {
+    const ip = getClientIp(req);
+    const now = Date.now();
+    const entry = store.get(ip);
+
+    if (!entry || now - entry.windowStart > windowMs) {
+      store.set(ip, { count: 1, windowStart: now });
+    } else if (entry.count >= limit) {
+      res.status(429).json({ error: overLimitMessage });
+      return;
+    } else {
+      entry.count += 1;
+    }
+
+    if (store.size > 5000) {
+      for (const [k, v] of store) {
+        if (now - v.windowStart > windowMs) store.delete(k);
+      }
+    }
+
+    next();
+  };
+}
+
 const quickCheckRateLimit = makeDailyRateLimit(
   new Map<string, { count: number; day: string }>(),
   QC_DAILY_LIMIT,
@@ -72,6 +118,26 @@ const submitSignalRateLimit = makeDailyRateLimit(
   new Map<string, { count: number; day: string }>(),
   SIGNAL_DAILY_LIMIT,
   "You've reached today's limit for sharing community signals. Please try again tomorrow."
+);
+
+// Short-window burst caps (per client, in-memory): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
+const quickCheckBurstLimit = makeBurstRateLimit(
+  new Map<string, { count: number; windowStart: number }>(),
+  5,
+  5 * 60 * 1000,
+  "You're checking a little too fast. Please wait a moment and try again."
+);
+const uploadBurstLimit = makeBurstRateLimit(
+  new Map<string, { count: number; windowStart: number }>(),
+  3,
+  5 * 60 * 1000,
+  "Too many file checks in a short time. Please wait a few minutes and try again."
+);
+const signalBurstLimit = makeBurstRateLimit(
+  new Map<string, { count: number; windowStart: number }>(),
+  5,
+  10 * 60 * 1000,
+  "Too many signal submissions in a short time. Please wait a few minutes and try again."
 );
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
@@ -190,8 +256,38 @@ function safeSignalEntities(entities: any): ExtractedEntities {
 async function startServer() {
   const app = express();
   
-  // Parse incoming JSON requests up to 15mb
+  // Reject oversized PUBLIC Quick Check text requests EARLY (before body parsing) via the declared
+  // Content-Length. Those endpoints only need a few KB; the 15mb limit below still covers the
+  // authenticated routes. Returns a calm JSON error, never a stack trace.
+  const PUBLIC_TEXT_PATHS = new Set(["/api/quick-check/analyze", "/api/quick-check/submit-signal"]);
+  app.use((req: any, res: any, next: any) => {
+    if (req.method === "POST" && PUBLIC_TEXT_PATHS.has(req.path)) {
+      const declared = Number(req.headers["content-length"] || 0);
+      if (declared > PUBLIC_JSON_MAX_BYTES) {
+        res.status(413).json({ error: "Request too large. Paste the message text instead of a large payload." });
+        return;
+      }
+    }
+    next();
+  });
+
+  // Parse incoming JSON requests up to 15mb (authenticated routes). Public text routes are also
+  // capped at PUBLIC_JSON_MAX_BYTES by the guard above.
   app.use(express.json({ limit: "15mb" }));
+
+  // Calm JSON errors for body-parser failures (oversized or malformed JSON) instead of stack traces.
+  app.use((err: any, _req: any, res: any, next: any) => {
+    if (!err) return next();
+    if (err.type === "entity.too.large") {
+      res.status(413).json({ error: "Request too large." });
+      return;
+    }
+    if (err.type === "entity.parse.failed" || err instanceof SyntaxError) {
+      res.status(400).json({ error: "Invalid request body." });
+      return;
+    }
+    res.status(400).json({ error: "Request could not be processed." });
+  });
 
   // Configure multer for secure memory storage. Files are held in memory only for
   // processing (redaction + validation) and streamed to Cloud Storage — no permanent
@@ -981,7 +1077,7 @@ async function startServer() {
   // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
   // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
   // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
-  app.post("/api/quick-check/analyze", quickCheckRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze", quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
     try {
       const { text } = req.body || {};
       if (!text || typeof text !== "string" || !text.trim()) {
@@ -1002,7 +1098,7 @@ async function startServer() {
   // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
   // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
   // handler intentionally has no Firestore/Storage/disk write path.
-  app.post("/api/quick-check/analyze-file", quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze-file", uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "Attach a .txt, .csv, .json, or .html file to run a Quick Check." });
@@ -1043,7 +1139,7 @@ async function startServer() {
   // --- PUBLIC COMMUNITY SIGNAL SUBMISSION (no auth; rate-limited; redacted-only) ---
   // Stores ONLY redacted/derived data for later admin pattern review. No raw input, no files,
   // no full identifiers. Requires explicit consent.
-  app.post("/api/quick-check/submit-signal", submitSignalRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/submit-signal", signalBurstLimit, submitSignalRateLimit, async (req: any, res: any) => {
     try {
       const { consentGiven, result } = req.body || {};
 
