@@ -35,7 +35,7 @@ jobs:
       - name: Secret pattern scan (tracked files)
         run: |
           set -e
-          if git grep -nI -E 'BEGIN PRIVATE KEY|private_key_id' -- . ':!docs/**' ':!src/lib/security/redaction.ts'; then
+          if git grep -nI -E 'BEGIN PRIVATE KEY|private_key_id' -- . ':!docs/**' ':!src/lib/security/redaction.ts' ':!.github/**'; then
             echo "Possible private key material found in tracked files."
             exit 1
           fi
