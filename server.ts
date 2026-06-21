@@ -11,6 +11,11 @@ import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
 import { validateUploadedFile } from "./src/lib/security/fileValidation";
+import {
+  isCaseOwner,
+  buildCaseUpdatePayload,
+  resolveOwnerIdFromToken,
+} from "./src/lib/security/ownerIsolation";
 import multer from "multer";
 import fs from "fs";
 
@@ -448,7 +453,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -472,7 +477,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case report." });
         return;
       }
@@ -496,7 +501,7 @@ async function startServer() {
       const caseId = `case-${Date.now()}`;
       const newCase: FraudCase & { ownerId: string } = {
         id: caseId,
-        ownerId: req.user.uid,
+        ownerId: resolveOwnerIdFromToken(req.user.uid),
         title,
         description,
         status: "draft",
@@ -534,7 +539,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -544,7 +549,7 @@ async function startServer() {
 
       const newEvidence: EvidenceItem = {
         id: `ev-${Date.now()}`,
-        ownerId: req.user.uid,
+        ownerId: resolveOwnerIdFromToken(req.user.uid),
         caseId: id,
         type,
         title,
@@ -612,7 +617,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -665,7 +670,7 @@ async function startServer() {
           contentType: req.file.mimetype,
           metadata: {
             cacheControl: "private, max-age=31536000",
-            ownerId: req.user.uid,
+            ownerId: resolveOwnerIdFromToken(req.user.uid),
             caseId: id,
             evidenceId: evidenceId,
           },
@@ -702,7 +707,7 @@ async function startServer() {
 
       const newEvidence: EvidenceItem = {
         id: evidenceId,
-        ownerId: req.user.uid,
+        ownerId: resolveOwnerIdFromToken(req.user.uid),
         caseId: id,
         type,
         title,
@@ -755,7 +760,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -873,7 +878,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -951,7 +956,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
         return;
       }
@@ -994,7 +999,7 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to delete this case." });
         return;
       }
@@ -1011,8 +1016,6 @@ async function startServer() {
   const handleUpdate = async (req: any, res: any) => {
     try {
       const { id } = req.params;
-      const { status, title, description, incidentDate } = req.body;
-      
       const docRef = adminDb.collection("cases").doc(id);
       const doc = await docRef.get();
       
@@ -1022,20 +1025,14 @@ async function startServer() {
       }
 
       const caseData = doc.data();
-      if (caseData?.ownerId !== req.user.uid) {
+      if (!isCaseOwner(caseData, req.user.uid)) {
         res.status(403).json({ error: "Forbidden: Access denied to update this case." });
         return;
       }
 
-      const updates: any = {};
-      if (title !== undefined) updates.title = title;
-      if (description !== undefined) updates.description = description;
-      if (incidentDate !== undefined) updates.incidentDate = incidentDate;
-      if (status !== undefined) updates.status = status;
-      updates.updatedAt = new Date().toISOString();
-
-      await docRef.update(updates);
-      res.json({ id, ...caseData, ...updates });
+      const { updates, updatedAt } = buildCaseUpdatePayload(req.body ?? {});
+      await docRef.update({ ...updates, updatedAt });
+      res.json({ id, ...caseData, ...updates, updatedAt });
     } catch (err: any) {
       console.error("Update case error:", err);
       res.status(500).json({ error: err.message });
@@ -1054,7 +1051,7 @@ async function startServer() {
         return {
           ...c,
           id: newId,
-          ownerId: req.user.uid,
+          ownerId: resolveOwnerIdFromToken(req.user.uid),
           title: `${c.title} (Demo)`,
           createdAt: new Date(Date.now() - idx * 3600000).toISOString(),
           updatedAt: new Date().toISOString(),
