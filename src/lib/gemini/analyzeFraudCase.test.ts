@@ -137,8 +137,9 @@ test("falls back to the heuristic when Gemini exceeds the timeout (before the ro
     models: {
       generateContent: () =>
         new Promise<{ text?: string }>((resolve) => {
-          const t = setTimeout(() => resolve({ text: VALID_ANALYSIS_JSON }), 1000);
-          t.unref();
+          // Ref'd + short (>timeoutMs): the timeout still fires first, but the mock promise settles
+          // before the event loop exits, so node:test does not cancel the test on CI (Node 22).
+          setTimeout(() => resolve({ text: VALID_ANALYSIS_JSON }), 120);
         }),
     },
   };
@@ -172,8 +173,7 @@ test("timeout fallback logs structured metadata and never raw evidence", async (
       models: {
         generateContent: () =>
           new Promise<{ text?: string }>((resolve) => {
-            const t = setTimeout(() => resolve({ text: "{}" }), 1000);
-            t.unref();
+            setTimeout(() => resolve({ text: "{}" }), 120);
           }),
       },
     };
