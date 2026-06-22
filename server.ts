@@ -14,6 +14,7 @@ import { validateUploadedFile } from "./src/lib/security/fileValidation";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
+import { createCaptchaMiddleware } from "./src/lib/security/captcha";
 import {
   isCaseOwner,
   buildCaseUpdatePayload,
@@ -81,6 +82,10 @@ const signalBurstLimit = makeBurstRateLimit(
 // unless APP_CHECK_ENFORCE=true. Enable only after the client attaches App Check tokens
 // (see docs/APP_CHECK_IMPLEMENTATION_PLAN.md). Applied before rate limiters on public routes.
 const verifyAppCheck = createAppCheckMiddleware();
+
+// CAPTCHA / Turnstile human attestation for public routes. DEFAULT-OFF: passes through unless
+// CAPTCHA_ENFORCE=true (and CAPTCHA_SECRET_KEY is provisioned). No secret is committed.
+const verifyCaptcha = createCaptchaMiddleware();
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
 // demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
@@ -1021,7 +1026,7 @@ async function startServer() {
   // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
   // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
   // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
-  app.post("/api/quick-check/analyze", verifyAppCheck, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze", verifyAppCheck, verifyCaptcha, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
     try {
       const { text } = req.body || {};
       if (!text || typeof text !== "string" || !text.trim()) {
@@ -1042,7 +1047,7 @@ async function startServer() {
   // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
   // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
   // handler intentionally has no Firestore/Storage/disk write path.
-  app.post("/api/quick-check/analyze-file", verifyAppCheck, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze-file", verifyAppCheck, verifyCaptcha, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "Attach a .txt, .csv, .json, or .html file to run a Quick Check." });
@@ -1083,7 +1088,7 @@ async function startServer() {
   // --- PUBLIC COMMUNITY SIGNAL SUBMISSION (no auth; rate-limited; redacted-only) ---
   // Stores ONLY redacted/derived data for later admin pattern review. No raw input, no files,
   // no full identifiers. Requires explicit consent.
-  app.post("/api/quick-check/submit-signal", verifyAppCheck, signalBurstLimit, submitSignalRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/submit-signal", verifyAppCheck, verifyCaptcha, signalBurstLimit, submitSignalRateLimit, async (req: any, res: any) => {
     try {
       const { consentGiven, result } = req.body || {};
 
