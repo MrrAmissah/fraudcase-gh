@@ -1047,9 +1047,12 @@ async function startServer() {
 
       // Redact → analyze redacted text only → ephemeral result (shared with the upload endpoint).
       const result = await buildQuickCheckResult(text);
+      // The route timeout may have already responded (503) while analysis ran; never double-send.
+      if (res.headersSent) return;
       res.json(result);
     } catch (err: any) {
       logRouteError("quick_check_analyze", "/api/quick-check/analyze", err);
+      if (res.headersSent) return;
       res.status(500).json({ error: "Could not complete the Quick Check. Please try again." });
     }
   });
@@ -1089,9 +1092,12 @@ async function startServer() {
 
       // Identical ephemeral pipeline as the paste flow: redact → analyze redacted text → return.
       const result = await buildQuickCheckResult(rawText);
+      // The route timeout may have already responded (503) while analysis ran; never double-send.
+      if (res.headersSent) return;
       res.json(result);
     } catch (err: any) {
       logRouteError("quick_check_analyze_file", "/api/quick-check/analyze-file", err);
+      if (res.headersSent) return;
       res.status(500).json({ error: "Could not complete the Quick Check upload. Please try again." });
     }
   });
