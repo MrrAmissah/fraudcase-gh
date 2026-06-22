@@ -42,4 +42,6 @@ export interface FraudAnalysis {
   recommendedNextSteps: string[];
   reportSummary: string;
   disclaimer: string;
+  /** Which engine produced this analysis: the Gemini model, or the local heuristic fallback. */
+  analysisProvider?: "gemini" | "heuristic";
 }

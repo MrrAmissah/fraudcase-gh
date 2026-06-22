@@ -19,4 +19,6 @@ export interface QuickCheckResult {
   saveAsCaseAvailable: boolean;
   shareRedactedSignalAvailable: boolean;
   disclaimer: string;
+  /** Which engine produced this analysis: the Gemini model, or the local heuristic fallback. */
+  analysisProvider?: "gemini" | "heuristic";
 }

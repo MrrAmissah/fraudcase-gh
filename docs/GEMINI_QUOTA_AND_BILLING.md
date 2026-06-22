@@ -78,6 +78,7 @@ Log structured events (no content):
 | `GEMINI_API_KEY` | Server-only; from Secret Manager in prod |
 | `GEMINI_MODEL` | Optional override (default `gemini-3.5-flash`) |
 | `GEMINI_MAX_DAILY_REQUESTS` | Optional app-level cap (Sprint 2) |
+| `GEMINI_ANALYSIS_TIMEOUT_MS` | Optional per-call analysis timeout (ms); default 15000; slow Gemini falls back to the heuristic |
 
 Never expose `GEMINI_API_KEY` to the client.
 

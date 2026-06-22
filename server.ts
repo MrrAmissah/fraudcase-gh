@@ -150,6 +150,7 @@ async function buildQuickCheckResult(rawText: string): Promise<QuickCheckResult>
     saveAsCaseAvailable: true,
     shareRedactedSignalAvailable: false,
     disclaimer: QUICK_CHECK_DISCLAIMER,
+    analysisProvider: analysis.analysisProvider,
   };
 }
 
