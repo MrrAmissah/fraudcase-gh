@@ -3,8 +3,21 @@ import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
+/**
+ * Returns the value of a required Vite environment variable, or throws a clear
+ * error that names the missing variable. The error message never contains the value.
+ */
+function requireEnv(name: string, value: string | undefined): string {
+  if (!value || value.trim() === "") {
+    throw new Error(
+      `Missing required environment variable: ${name}. Set it in your .env (see .env.example).`,
+    );
+  }
+  return value;
+}
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCTAEH25dT_H54-KdhfRCe-W1KE2VKbQqM",
+  apiKey: requireEnv("VITE_FIREBASE_API_KEY", import.meta.env.VITE_FIREBASE_API_KEY),
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "stellar-perigee-498907-c4.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "stellar-perigee-498907-c4",
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "stellar-perigee-498907-c4.firebasestorage.app",
