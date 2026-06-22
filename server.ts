@@ -13,6 +13,7 @@ import { redactPIIAndSecrets } from "./src/lib/security/redaction";
 import { validateUploadedFile } from "./src/lib/security/fileValidation";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
+import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
 import {
   isCaseOwner,
   buildCaseUpdatePayload,
@@ -34,117 +35,46 @@ const SIGNAL_DAILY_LIMIT = 10; // anonymous community-signal submissions per IP 
 const QC_MAX_INPUT_CHARS = 5000; // public input length cap
 const PUBLIC_JSON_MAX_BYTES = 1 * 1024 * 1024; // 1MB cap for public text endpoints (analyze, submit-signal)
 
-// Trust the X-Forwarded-For header for the client IP ONLY when explicitly running behind a known
-// proxy (set TRUST_PROXY=true in production). Otherwise the header is client-spoofable, so we ignore
-// it and use the socket address. This stops a local/dev script from rotating fake IPs to dodge limits.
-const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+// Public-route rate limiting (getClientIp, daily + burst limiters, and the shared-store seam)
+// now lives in src/lib/security/rateLimit.ts. Behavior is preserved exactly; a Redis-backed shared
+// store can be added via RATE_LIMIT_REDIS_URL later (see docs/SHARED_RATE_LIMIT_PLAN.md).
 
-function getClientIp(req: any): string {
-  let ip = "";
-  if (TRUST_PROXY) {
-    ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  }
-  if (!ip) {
-    ip = req.socket?.remoteAddress || req.ip || "unknown";
-  }
-  // Normalize: strip the IPv6-mapped IPv4 prefix and lowercase so one client maps to one bucket.
-  return String(ip).replace(/^::ffff:/i, "").trim().toLowerCase() || "unknown";
-}
-
-// Best-effort per-IP DAILY limiter for public endpoints. In-app and only as trustworthy as the
-// client IP, so it is a scaffold: App Check / CAPTCHA / a platform WAF are the real controls
-// (see docs/QUICK_CHECK_TODO.md and docs/SECURITY_PRIVACY_OVERVIEW.md).
-function makeDailyRateLimit(
-  store: Map<string, { count: number; day: string }>,
-  limit: number,
-  overLimitMessage: string
-) {
-  return function (req: any, res: any, next: any) {
-    const ip = getClientIp(req);
-    const today = new Date().toISOString().slice(0, 10);
-    const entry = store.get(ip);
-
-    if (!entry || entry.day !== today) {
-      store.set(ip, { count: 1, day: today });
-    } else if (entry.count >= limit) {
-      res.status(429).json({ error: overLimitMessage });
-      return;
-    } else {
-      entry.count += 1;
-    }
-
-    // Opportunistic cleanup of stale day buckets to bound memory.
-    if (store.size > 5000) {
-      for (const [k, v] of store) {
-        if (v.day !== today) store.delete(k);
-      }
-    }
-
-    next();
-  };
-}
-
-// Short-window BURST limiter (fixed window) layered on top of the daily cap to blunt rapid scripted
-// floods. Same best-effort caveat as the daily limiter; in-memory per instance.
-function makeBurstRateLimit(
-  store: Map<string, { count: number; windowStart: number }>,
-  limit: number,
-  windowMs: number,
-  overLimitMessage: string
-) {
-  return function (req: any, res: any, next: any) {
-    const ip = getClientIp(req);
-    const now = Date.now();
-    const entry = store.get(ip);
-
-    if (!entry || now - entry.windowStart > windowMs) {
-      store.set(ip, { count: 1, windowStart: now });
-    } else if (entry.count >= limit) {
-      res.status(429).json({ error: overLimitMessage });
-      return;
-    } else {
-      entry.count += 1;
-    }
-
-    if (store.size > 5000) {
-      for (const [k, v] of store) {
-        if (now - v.windowStart > windowMs) store.delete(k);
-      }
-    }
-
-    next();
-  };
-}
+const rateLimitStore = getRateLimitStore();
 
 const quickCheckRateLimit = makeDailyRateLimit(
-  new Map<string, { count: number; day: string }>(),
+  "qc_analyze",
   QC_DAILY_LIMIT,
-  "You've reached today's free Quick Check limit. Create a free account to keep checking evidence."
+  "You've reached today's free Quick Check limit. Create a free account to keep checking evidence.",
+  rateLimitStore,
 );
 const submitSignalRateLimit = makeDailyRateLimit(
-  new Map<string, { count: number; day: string }>(),
+  "signal",
   SIGNAL_DAILY_LIMIT,
-  "You've reached today's limit for sharing community signals. Please try again tomorrow."
+  "You've reached today's limit for sharing community signals. Please try again tomorrow.",
+  rateLimitStore,
 );
 
-// Short-window burst caps (per client, in-memory): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
+// Short-window burst caps (per client): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
 const quickCheckBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "qc_analyze_burst",
   5,
   5 * 60 * 1000,
-  "You're checking a little too fast. Please wait a moment and try again."
+  "You're checking a little too fast. Please wait a moment and try again.",
+  rateLimitStore,
 );
 const uploadBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "qc_file_burst",
   3,
   5 * 60 * 1000,
-  "Too many file checks in a short time. Please wait a few minutes and try again."
+  "Too many file checks in a short time. Please wait a few minutes and try again.",
+  rateLimitStore,
 );
 const signalBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "signal_burst",
   5,
   10 * 60 * 1000,
-  "Too many signal submissions in a short time. Please wait a few minutes and try again."
+  "Too many signal submissions in a short time. Please wait a few minutes and try again.",
+  rateLimitStore,
 );
 
 // App Check verification for public abuse-prone routes. DEFAULT-OFF: passes through
