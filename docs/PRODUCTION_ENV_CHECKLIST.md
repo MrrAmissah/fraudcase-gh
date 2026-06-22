@@ -36,6 +36,7 @@ Use before staging deploy and public launch. Never commit real values.
 | `APP_CHECK_ENFORCE` | Sprint 2 | `true` in prod |
 | `RATE_LIMIT_REDIS_URL` | Sprint 2 | Upstash/Redis |
 | `CAPTCHA_SECRET_KEY` | Sprint 2 | Secret Manager |
+| `CAPTCHA_ENFORCE` | Sprint 2 | `true` to enforce CAPTCHA |
 
 ---
 
@@ -62,12 +63,12 @@ Use before staging deploy and public launch. Never commit real values.
 
 ## Deploy platform
 
-- [ ] Health check configured
+- [ ] Health check configured (`GET /api/health`)
 - [ ] `TRUST_PROXY=true` if using platform load balancer
 - [ ] WAF / rate rules enabled
 - [ ] Secrets injected at runtime (not baked in image)
 - [ ] `secure_uploads/` not used in prod (GCS only)
-- [ ] Rollback procedure documented ([`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md) §17)
+- [ ] Rollback procedure documented ([`DEPLOYMENT_RUNBOOK.md`](./DEPLOYMENT_RUNBOOK.md) §8)
 
 ---
 

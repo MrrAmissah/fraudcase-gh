@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generateHeuristicMockAnalysis } from "./analyzeFraudCase";
+import { analyzeFraudCase, generateHeuristicMockAnalysis } from "./analyzeFraudCase";
 import { getRiskLevel } from "../utils/risk";
 import { EvidenceItem } from "../../types/evidence";
 
@@ -103,5 +103,103 @@ test("extracts only exact evidence-derived urls and amounts", () => {
   }
   for (const p of analysis.extractedEntities.phoneNumbers) {
     assert.ok(corpus.includes(p), `fabricated phone not in evidence: ${p}`);
+  }
+});
+
+// --- Gemini timeout / slowness fallback (Sprint 2 hardening) ---
+
+const VALID_ANALYSIS_JSON = JSON.stringify({
+  scamCategory: "phishing",
+  confidence: "high",
+  riskScore: 70,
+  shortSummary: "The message shows possible phishing indicators.",
+  suspiciousIndicators: ["Urgent account verification request."],
+  extractedEntities: {
+    phoneNumbers: [], urls: [], names: [], organizations: [],
+    amounts: [], dates: [], transactionReferences: [], locations: [],
+  },
+  timeline: [],
+  evidenceChecklist: [],
+  recommendedNextSteps: ["Do not click the link."],
+  reportSummary: "Summary.",
+  disclaimer: "Not a legal determination.",
+});
+
+test("uses the Gemini result (analysisProvider 'gemini') when the client responds in time", async () => {
+  const client = { models: { generateContent: async () => ({ text: VALID_ANALYSIS_JSON }) } };
+  const result = await analyzeFraudCase("t", "d", [], { client: client as any, timeoutMs: 1000 });
+  assert.equal(result.analysisProvider, "gemini");
+  assert.equal(result.scamCategory, "phishing");
+});
+
+test("falls back to the heuristic when Gemini exceeds the timeout (before the route timeout)", async () => {
+  const slow = {
+    models: {
+      generateContent: () =>
+        new Promise<{ text?: string }>((resolve) => {
+          // Ref'd + short (>timeoutMs): the timeout still fires first, but the mock promise settles
+          // before the event loop exits, so node:test does not cancel the test on CI (Node 22).
+          setTimeout(() => resolve({ text: VALID_ANALYSIS_JSON }), 120);
+        }),
+    },
+  };
+  const start = Date.now();
+  const result = await analyzeFraudCase(
+    "Delivery fee SMS",
+    "Parcel clearance fee requested.",
+    [evidence("sms", "Delivery SMS", "GH-POST: pay a delivery clearance fee.")],
+    { client: slow as any, timeoutMs: 30 },
+  );
+  assert.ok(Date.now() - start < 500, "fallback should fire at the timeout, not after Gemini resolves");
+  assert.equal(result.analysisProvider, "heuristic");
+  assert.equal(result.scamCategory, "fake_delivery");
+});
+
+test("client:null forces the heuristic", async () => {
+  const result = await analyzeFraudCase("t", "d", [], { client: null });
+  assert.equal(result.analysisProvider, "heuristic");
+});
+
+test("timeout fallback logs structured metadata and never raw evidence", async () => {
+  const marker = "VICTIM-CHAT-0241234567-do-not-log";
+  const lines: string[] = [];
+  const origWarn = console.warn;
+  const origLog = console.log;
+  const sink = (...a: unknown[]) => lines.push(a.map(String).join(" "));
+  console.warn = sink as typeof console.warn;
+  console.log = sink as typeof console.log;
+  try {
+    const slow = {
+      models: {
+        generateContent: () =>
+          new Promise<{ text?: string }>((resolve) => {
+            setTimeout(() => resolve({ text: "{}" }), 120);
+          }),
+      },
+    };
+    const result = await analyzeFraudCase("t", marker, [evidence("sms", "t", marker)], {
+      client: slow as any,
+      timeoutMs: 20,
+    });
+    assert.equal(result.analysisProvider, "heuristic");
+  } finally {
+    console.warn = origWarn;
+    console.log = origLog;
+  }
+  const joined = lines.join("\n");
+  assert.ok(joined.includes("gemini_analysis_timeout"), "expected a structured timeout event");
+  assert.ok(!joined.includes(marker), "structured log must never contain raw evidence");
+});
+
+test("heuristic fallback stays non-accusatory (no 'confirmed fraud' wording)", () => {
+  const a = generateHeuristicMockAnalysis(
+    "Delivery fee SMS",
+    "Parcel clearance fee requested.",
+    [evidence("sms", "Delivery SMS", "GH-POST: pay a clearance fee.")],
+  );
+  const blob =
+    `${a.shortSummary} ${a.disclaimer} ${a.suspiciousIndicators.join(" ")} ${a.recommendedNextSteps.join(" ")}`.toLowerCase();
+  for (const banned of ["confirmed fraud", "confirmed scam", "is a scammer", "scammer database"]) {
+    assert.ok(!blob.includes(banned), `non-accusatory: must not contain "${banned}"`);
   }
 });

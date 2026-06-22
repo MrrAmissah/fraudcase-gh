@@ -11,6 +11,11 @@ import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
 import { validateUploadedFile } from "./src/lib/security/fileValidation";
+import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
+import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
+import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
+import { createCaptchaMiddleware } from "./src/lib/security/captcha";
+import { makeRequestTimeout } from "./src/lib/security/requestTimeout";
 import {
   isCaseOwner,
   buildCaseUpdatePayload,
@@ -32,118 +37,60 @@ const SIGNAL_DAILY_LIMIT = 10; // anonymous community-signal submissions per IP 
 const QC_MAX_INPUT_CHARS = 5000; // public input length cap
 const PUBLIC_JSON_MAX_BYTES = 1 * 1024 * 1024; // 1MB cap for public text endpoints (analyze, submit-signal)
 
-// Trust the X-Forwarded-For header for the client IP ONLY when explicitly running behind a known
-// proxy (set TRUST_PROXY=true in production). Otherwise the header is client-spoofable, so we ignore
-// it and use the socket address. This stops a local/dev script from rotating fake IPs to dodge limits.
-const TRUST_PROXY = process.env.TRUST_PROXY === "true";
+// Public-route rate limiting (getClientIp, daily + burst limiters, and the shared-store seam)
+// now lives in src/lib/security/rateLimit.ts. Behavior is preserved exactly; a Redis-backed shared
+// store can be added via RATE_LIMIT_REDIS_URL later (see docs/SHARED_RATE_LIMIT_PLAN.md).
 
-function getClientIp(req: any): string {
-  let ip = "";
-  if (TRUST_PROXY) {
-    ip = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
-  }
-  if (!ip) {
-    ip = req.socket?.remoteAddress || req.ip || "unknown";
-  }
-  // Normalize: strip the IPv6-mapped IPv4 prefix and lowercase so one client maps to one bucket.
-  return String(ip).replace(/^::ffff:/i, "").trim().toLowerCase() || "unknown";
-}
-
-// Best-effort per-IP DAILY limiter for public endpoints. In-app and only as trustworthy as the
-// client IP, so it is a scaffold: App Check / CAPTCHA / a platform WAF are the real controls
-// (see docs/QUICK_CHECK_TODO.md and docs/SECURITY_PRIVACY_OVERVIEW.md).
-function makeDailyRateLimit(
-  store: Map<string, { count: number; day: string }>,
-  limit: number,
-  overLimitMessage: string
-) {
-  return function (req: any, res: any, next: any) {
-    const ip = getClientIp(req);
-    const today = new Date().toISOString().slice(0, 10);
-    const entry = store.get(ip);
-
-    if (!entry || entry.day !== today) {
-      store.set(ip, { count: 1, day: today });
-    } else if (entry.count >= limit) {
-      res.status(429).json({ error: overLimitMessage });
-      return;
-    } else {
-      entry.count += 1;
-    }
-
-    // Opportunistic cleanup of stale day buckets to bound memory.
-    if (store.size > 5000) {
-      for (const [k, v] of store) {
-        if (v.day !== today) store.delete(k);
-      }
-    }
-
-    next();
-  };
-}
-
-// Short-window BURST limiter (fixed window) layered on top of the daily cap to blunt rapid scripted
-// floods. Same best-effort caveat as the daily limiter; in-memory per instance.
-function makeBurstRateLimit(
-  store: Map<string, { count: number; windowStart: number }>,
-  limit: number,
-  windowMs: number,
-  overLimitMessage: string
-) {
-  return function (req: any, res: any, next: any) {
-    const ip = getClientIp(req);
-    const now = Date.now();
-    const entry = store.get(ip);
-
-    if (!entry || now - entry.windowStart > windowMs) {
-      store.set(ip, { count: 1, windowStart: now });
-    } else if (entry.count >= limit) {
-      res.status(429).json({ error: overLimitMessage });
-      return;
-    } else {
-      entry.count += 1;
-    }
-
-    if (store.size > 5000) {
-      for (const [k, v] of store) {
-        if (now - v.windowStart > windowMs) store.delete(k);
-      }
-    }
-
-    next();
-  };
-}
+const rateLimitStore = getRateLimitStore();
 
 const quickCheckRateLimit = makeDailyRateLimit(
-  new Map<string, { count: number; day: string }>(),
+  "qc_analyze",
   QC_DAILY_LIMIT,
-  "You've reached today's free Quick Check limit. Create a free account to keep checking evidence."
+  "You've reached today's free Quick Check limit. Create a free account to keep checking evidence.",
+  rateLimitStore,
 );
 const submitSignalRateLimit = makeDailyRateLimit(
-  new Map<string, { count: number; day: string }>(),
+  "signal",
   SIGNAL_DAILY_LIMIT,
-  "You've reached today's limit for sharing community signals. Please try again tomorrow."
+  "You've reached today's limit for sharing community signals. Please try again tomorrow.",
+  rateLimitStore,
 );
 
-// Short-window burst caps (per client, in-memory): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
+// Short-window burst caps (per client): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
 const quickCheckBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "qc_analyze_burst",
   5,
   5 * 60 * 1000,
-  "You're checking a little too fast. Please wait a moment and try again."
+  "You're checking a little too fast. Please wait a moment and try again.",
+  rateLimitStore,
 );
 const uploadBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "qc_file_burst",
   3,
   5 * 60 * 1000,
-  "Too many file checks in a short time. Please wait a few minutes and try again."
+  "Too many file checks in a short time. Please wait a few minutes and try again.",
+  rateLimitStore,
 );
 const signalBurstLimit = makeBurstRateLimit(
-  new Map<string, { count: number; windowStart: number }>(),
+  "signal_burst",
   5,
   10 * 60 * 1000,
-  "Too many signal submissions in a short time. Please wait a few minutes and try again."
+  "Too many signal submissions in a short time. Please wait a few minutes and try again.",
+  rateLimitStore,
 );
+
+// App Check verification for public abuse-prone routes. DEFAULT-OFF: passes through
+// unless APP_CHECK_ENFORCE=true. Enable only after the client attaches App Check tokens
+// (see docs/APP_CHECK_IMPLEMENTATION_PLAN.md). Applied before rate limiters on public routes.
+const verifyAppCheck = createAppCheckMiddleware();
+
+// CAPTCHA / Turnstile human attestation for public routes. DEFAULT-OFF: passes through unless
+// CAPTCHA_ENFORCE=true (and CAPTCHA_SECRET_KEY is provisioned). No secret is committed.
+const verifyCaptcha = createCaptchaMiddleware();
+
+// Per-request timeout for expensive public (Gemini-backed) routes. Returns a calm 503 if a
+// request hangs, so a slow upstream cannot hold the connection open. Does not abort upstream work.
+const publicAnalyzeTimeout = makeRequestTimeout(20000);
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
 // demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
@@ -203,6 +150,7 @@ async function buildQuickCheckResult(rawText: string): Promise<QuickCheckResult>
     saveAsCaseAvailable: true,
     shareRedactedSignalAvailable: false,
     disclaimer: QUICK_CHECK_DISCLAIMER,
+    analysisProvider: analysis.analysisProvider,
   };
 }
 
@@ -265,11 +213,17 @@ async function startServer() {
   // Content-Length. Those endpoints only need a few KB; the 15mb limit below still covers the
   // authenticated routes. Returns a calm JSON error, never a stack trace.
   const PUBLIC_TEXT_PATHS = new Set(["/api/quick-check/analyze", "/api/quick-check/submit-signal"]);
+  const PUBLIC_FILE_PATH = "/api/quick-check/analyze-file";
+  const PUBLIC_FILE_MAX_BYTES = 6 * 1024 * 1024; // 5MB file + multipart overhead; multer enforces the hard 5MB cap
   app.use((req: any, res: any, next: any) => {
-    if (req.method === "POST" && PUBLIC_TEXT_PATHS.has(req.path)) {
+    if (req.method === "POST") {
       const declared = Number(req.headers["content-length"] || 0);
-      if (declared > PUBLIC_JSON_MAX_BYTES) {
+      if (PUBLIC_TEXT_PATHS.has(req.path) && declared > PUBLIC_JSON_MAX_BYTES) {
         res.status(413).json({ error: "Request too large. Paste the message text instead of a large payload." });
+        return;
+      }
+      if (req.path === PUBLIC_FILE_PATH && declared > PUBLIC_FILE_MAX_BYTES) {
+        res.status(413).json({ error: "File too large. The maximum upload is 5MB." });
         return;
       }
     }
@@ -387,7 +341,7 @@ async function startServer() {
       };
       next();
     } catch (err: any) {
-      console.error("Token verification failed:", err);
+      logEvent({ event: "token_verify_failed", level: "error", errorType: safeErrorType(err) });
       res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
   }
@@ -412,12 +366,22 @@ async function startServer() {
       req.user = { uid: decodedToken.uid, email: decodedToken.email };
       next();
     } catch (err: any) {
-      console.error("Admin token verification failed:", err);
+      logEvent({ event: "admin_token_verify_failed", level: "error", errorType: safeErrorType(err) });
       res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
   }
 
   // --- API ROUTES ---
+
+  // Liveness/health check for deploy platforms and uptime monitors. Public, no auth.
+  // Returns only safe, non-sensitive fields: never env values, versions, secrets, or paths.
+  app.get("/api/health", (_req: any, res: any) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+    });
+  });
 
   // Get all cases owned by the authenticated user
   app.get("/api/cases", requireAuth, async (req: any, res: any) => {
@@ -436,7 +400,7 @@ async function startServer() {
 
       res.json(cases);
     } catch (err: any) {
-      console.error("Fetch cases error:", err);
+      logRouteError("fetch_cases", "/api/cases", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -460,7 +424,7 @@ async function startServer() {
 
       res.json({ id: doc.id, ...caseData });
     } catch (err: any) {
-      console.error("Fetch specific case error:", err);
+      logRouteError("fetch_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -484,7 +448,7 @@ async function startServer() {
 
       res.json({ id: doc.id, ...caseData });
     } catch (err: any) {
-      console.error("Fetch case report error:", err);
+      logRouteError("fetch_case_report", "/api/cases/:id/report", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -514,7 +478,7 @@ async function startServer() {
       await adminDb.collection("cases").doc(caseId).set(newCase);
       res.status(201).json(newCase);
     } catch (err: any) {
-      console.error("Create case error:", err);
+      logRouteError("create_case", "/api/cases", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -578,7 +542,7 @@ async function startServer() {
       await docRef.update(updates);
       res.status(201).json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("Add evidence error:", err);
+      logRouteError("add_evidence", "/api/cases/:id/evidence", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -678,7 +642,7 @@ async function startServer() {
         gcsSuccess = true;
         console.log(`Evidence stored in Cloud Storage: ${storagePath}`);
       } catch (gcsErr: any) {
-        console.warn("Cloud Storage upload failed:", gcsErr.message);
+        logEvent({ event: "gcs_upload_failed", level: "warn", errorType: safeErrorType(gcsErr) });
       }
 
       if (gcsSuccess) {
@@ -699,7 +663,7 @@ async function startServer() {
           storageProvider = "local-dev";
           console.warn(`[DEV-ONLY] Cloud Storage unavailable — evidence stored locally (provider=local-dev): ${storagePath}`);
         } catch (localErr: any) {
-          console.error("Dev-only local storage failed:", localErr);
+          logEvent({ event: "dev_local_storage_failed", level: "error", errorType: safeErrorType(localErr) });
           res.status(500).json({ error: "Could not store the evidence file." });
           return;
         }
@@ -743,7 +707,7 @@ async function startServer() {
       await docRef.update(updates);
       res.status(201).json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("File upload evidence error:", err);
+      logRouteError("upload_evidence", "/api/cases/:id/evidence/upload", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -814,7 +778,7 @@ async function startServer() {
         if (exists) {
           const readStream = fileRef.createReadStream();
           readStream.on("error", (streamErr) => {
-            console.error("Cloud Storage stream error.", streamErr);
+            logEvent({ event: "gcs_stream_error", level: "error", route: "/api/cases/:id/evidence/:evidenceId/file", errorType: safeErrorType(streamErr) });
             if (!res.headersSent) {
               res.status(502).json({ error: "Could not stream the stored evidence file." });
             } else {
@@ -825,14 +789,14 @@ async function startServer() {
           served = true;
         }
       } catch (gcsStreamErr) {
-        console.warn("Could not query Cloud Storage object.", gcsStreamErr);
+        logEvent({ event: "gcs_query_failed", level: "warn", errorType: safeErrorType(gcsStreamErr) });
       }
 
       if (!served) {
         res.status(404).json({ error: "The evidence file could not be located in Cloud Storage." });
       }
     } catch (err: any) {
-      console.error("Secure file retrieval error:", err);
+      logRouteError("get_evidence_file", "/api/cases/:id/evidence/:evidenceId/file", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -897,7 +861,7 @@ async function startServer() {
             console.log(`Deleted ${targetItem.storagePath} from GCS`);
           }
         } catch (gcsDeleteErr) {
-          console.warn("Could not purge GCS bytes:", gcsDeleteErr);
+          logEvent({ event: "gcs_purge_failed", level: "warn", errorType: safeErrorType(gcsDeleteErr) });
         }
 
         // 2. Purge from local workspace backup
@@ -920,7 +884,7 @@ async function startServer() {
             }
           }
         } catch (localDeleteErr) {
-          console.warn("Could not purge local file fallback:", localDeleteErr);
+          logEvent({ event: "local_purge_failed", level: "warn", errorType: safeErrorType(localDeleteErr) });
         }
       }
 
@@ -938,7 +902,7 @@ async function startServer() {
       await docRef.update(updates);
       res.json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("Delete evidence error:", err);
+      logRouteError("delete_evidence", "/api/cases/:id/evidence/:evidenceId", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -977,11 +941,11 @@ async function startServer() {
         await docRef.update(updates);
         res.json({ id, ...caseData, ...updates });
       } catch (err: any) {
-        console.error("Analysis execution error: ", err);
+        logEvent({ event: "analyze_execution_error", level: "error", route: "/api/cases/:id/analyze", errorType: safeErrorType(err) });
         res.status(500).json({ error: "Could not analyze evidence due to processing issues." });
       }
     } catch (err: any) {
-      console.error("Analyze case wrapper error:", err);
+      logRouteError("analyze_case", "/api/cases/:id/analyze", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1007,7 +971,7 @@ async function startServer() {
       await docRef.delete();
       res.json({ success: true, message: "Case successfully destroyed." });
     } catch (err: any) {
-      console.error("Delete case error:", err);
+      logRouteError("delete_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1034,7 +998,7 @@ async function startServer() {
       await docRef.update({ ...updates, updatedAt });
       res.json({ id, ...caseData, ...updates, updatedAt });
     } catch (err: any) {
-      console.error("Update case error:", err);
+      logRouteError("update_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   };
@@ -1066,7 +1030,7 @@ async function startServer() {
       await batch.commit();
       res.json({ success: true, message: "Demo cases imported successfully." });
     } catch (err: any) {
-      console.error("Seed demo cases error:", err);
+      logRouteError("seed_cases", "/api/cases/seed", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1074,7 +1038,7 @@ async function startServer() {
   // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
   // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
   // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
-  app.post("/api/quick-check/analyze", quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
     try {
       const { text } = req.body || {};
       if (!text || typeof text !== "string" || !text.trim()) {
@@ -1084,9 +1048,12 @@ async function startServer() {
 
       // Redact → analyze redacted text only → ephemeral result (shared with the upload endpoint).
       const result = await buildQuickCheckResult(text);
+      // The route timeout may have already responded (503) while analysis ran; never double-send.
+      if (res.headersSent) return;
       res.json(result);
     } catch (err: any) {
-      console.error("Quick Check analyze error:", err);
+      logRouteError("quick_check_analyze", "/api/quick-check/analyze", err);
+      if (res.headersSent) return;
       res.status(500).json({ error: "Could not complete the Quick Check. Please try again." });
     }
   });
@@ -1095,7 +1062,7 @@ async function startServer() {
   // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
   // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
   // handler intentionally has no Firestore/Storage/disk write path.
-  app.post("/api/quick-check/analyze-file", uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze-file", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "Attach a .txt, .csv, .json, or .html file to run a Quick Check." });
@@ -1126,9 +1093,12 @@ async function startServer() {
 
       // Identical ephemeral pipeline as the paste flow: redact → analyze redacted text → return.
       const result = await buildQuickCheckResult(rawText);
+      // The route timeout may have already responded (503) while analysis ran; never double-send.
+      if (res.headersSent) return;
       res.json(result);
     } catch (err: any) {
-      console.error("Quick Check upload analyze error:", err);
+      logRouteError("quick_check_analyze_file", "/api/quick-check/analyze-file", err);
+      if (res.headersSent) return;
       res.status(500).json({ error: "Could not complete the Quick Check upload. Please try again." });
     }
   });
@@ -1136,7 +1106,7 @@ async function startServer() {
   // --- PUBLIC COMMUNITY SIGNAL SUBMISSION (no auth; rate-limited; redacted-only) ---
   // Stores ONLY redacted/derived data for later admin pattern review. No raw input, no files,
   // no full identifiers. Requires explicit consent.
-  app.post("/api/quick-check/submit-signal", signalBurstLimit, submitSignalRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/submit-signal", verifyAppCheck, verifyCaptcha, signalBurstLimit, submitSignalRateLimit, async (req: any, res: any) => {
     try {
       const { consentGiven, result } = req.body || {};
 
@@ -1199,7 +1169,7 @@ async function startServer() {
       await adminDb.collection("communitySignals").doc(signalId).set(signal);
       res.status(201).json({ success: true });
     } catch (err: any) {
-      console.error("Submit community signal error:", err);
+      logRouteError("submit_signal", "/api/quick-check/submit-signal", err);
       res.status(500).json({ error: "Could not submit the signal. Please try again." });
     }
   });
@@ -1244,7 +1214,7 @@ async function startServer() {
 
       res.json({ stats, signals: list });
     } catch (err: any) {
-      console.error("List community signals error:", err);
+      logRouteError("list_signals", "/api/admin/community-signals", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1287,7 +1257,7 @@ async function startServer() {
       const updated = await ref.get();
       res.json({ id: updated.id, ...updated.data() });
     } catch (err: any) {
-      console.error("Update community signal error:", err);
+      logRouteError("update_signal", "/api/admin/community-signals/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1310,19 +1280,22 @@ async function startServer() {
     });
   }
 
-  // Launch service
-  app.listen(PORT, HOST, () => {
+  // Launch service. Capture the server to apply production request/header timeouts
+  // (slow-loris / hung-request guard). Generous so legitimate uploads are unaffected.
+  const server = app.listen(PORT, HOST, () => {
     console.log(`FraudCase GH [Fullstack Service] listening at http://${HOST}:${PORT}`);
   });
+  server.requestTimeout = 120000;
+  server.headersTimeout = 65000;
 }
 
 // Prevent a rejected background promise (e.g. a Firebase Admin credential lookup when running
 // without Application Default Credentials) from terminating the process. Public, unauthenticated
 // endpoints must never be able to crash the server via an unhandled rejection.
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection:", reason);
+  logEvent({ event: "unhandled_rejection", level: "error", errorType: safeErrorType(reason) });
 });
 
 startServer().catch((error) => {
-  console.error("Critical: Failed to boot custom Express + Vite server:", error);
+  logEvent({ event: "server_boot_failed", level: "error", errorType: safeErrorType(error) });
 });

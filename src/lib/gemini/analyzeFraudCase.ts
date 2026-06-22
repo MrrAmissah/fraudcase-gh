@@ -3,6 +3,7 @@ import { fraudCaseSchema } from "./fraudCaseSchema";
 import { FRAUD_CASE_PROMPT } from "./fraudCasePrompt";
 import { EvidenceItem } from "../../types/evidence";
 import { FraudAnalysis } from "../../types/analysis";
+import { logEvent, safeErrorType } from "../observability/logger";
 
 // Server-side Gemini model id. Centralised so it can be verified/swapped in one place and named in logs.
 const GEMINI_MODEL = "gemini-3.5-flash";
@@ -25,20 +26,70 @@ function getAiClient(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Default per-call Gemini timeout (ms). Kept under the public route timeout (20s) so a slow model
+// triggers the heuristic fallback BEFORE the route gives up. Override via GEMINI_ANALYSIS_TIMEOUT_MS.
+const DEFAULT_GEMINI_TIMEOUT_MS = 15000;
+function geminiTimeoutMs(): number {
+  const raw = Number(process.env.GEMINI_ANALYSIS_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_GEMINI_TIMEOUT_MS;
+}
+
+class GeminiTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Gemini analysis exceeded ${ms}ms`);
+    this.name = "GeminiTimeoutError";
+  }
+}
+
+/**
+ * Resolves with the promise's value, or rejects with GeminiTimeoutError after `ms`. A late
+ * resolution/rejection of the original promise is ignored (the race has already settled), so a
+ * slow Gemini response can never produce a second result or a second HTTP response.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    // Intentionally NOT unref'd: the timer is cleared as soon as the promise settles, and the
+    // long-running server already keeps the event loop alive. Leaving it ref'd makes the timeout
+    // callback fire deterministically under the test runner (an unref'd timer let the test process
+    // exit before the callback ran, cancelling the slow-Gemini fallback tests on CI).
+    const timer = setTimeout(() => reject(new GeminiTimeoutError(ms)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      },
+    );
+  });
+}
+
+export interface AnalyzeOptions {
+  /** Injectable client (tests): `undefined` uses the env client; `null` forces the heuristic. */
+  client?: GoogleGenAI | null;
+  /** Override the Gemini timeout (ms), mainly for tests. */
+  timeoutMs?: number;
+}
+
 /**
  * Server-side function to analyze suspicious messages and evidence items.
  */
 export async function analyzeFraudCase(
   caseTitle: string,
   caseDescription: string,
-  evidenceItems: EvidenceItem[]
+  evidenceItems: EvidenceItem[],
+  opts: AnalyzeOptions = {}
 ): Promise<FraudAnalysis> {
-  const client = getAiClient();
+  const client = opts.client !== undefined ? opts.client : getAiClient();
 
   if (!client) {
-    console.warn("GEMINI_API_KEY is not defined. Falling back to high-quality mock analysis.");
+    logEvent({ event: "gemini_unavailable", level: "warn", meta: { reason: "no_api_key", mode: "heuristic" } });
     return generateHeuristicMockAnalysis(caseTitle, caseDescription, evidenceItems);
   }
+
+  const timeoutMs = opts.timeoutMs ?? geminiTimeoutMs();
 
   try {
     const evidenceText = evidenceItems
@@ -55,16 +106,20 @@ export async function analyzeFraudCase(
       .replace("${caseDescription}", caseDescription)
       .replace("${evidenceText}", evidenceText);
 
-    // Call Gemini server-side
-    const response = await client.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: fullPrompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: fraudCaseSchema,
-        systemInstruction: "You are a cyber safety inspector. Respond strictly with formatted JSON analytical reports regarding potential digital risks in Ghana without stating guilt or legal outcomes.",
-      },
-    });
+    // Call Gemini server-side, bounded by a timeout so a slow model falls back to the heuristic
+    // BEFORE the public route timeout fires. A late Gemini resolution is ignored (see withTimeout).
+    const response = await withTimeout(
+      client.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: fullPrompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: fraudCaseSchema,
+          systemInstruction: "You are a cyber safety inspector. Respond strictly with formatted JSON analytical reports regarding potential digital risks in Ghana without stating guilt or legal outcomes.",
+        },
+      }),
+      timeoutMs,
+    );
 
     const textOutput = response.text;
     if (!textOutput) {
@@ -72,13 +127,20 @@ export async function analyzeFraudCase(
     }
 
     const parsed = JSON.parse(textOutput) as FraudAnalysis;
+    parsed.analysisProvider = "gemini";
     return parsed;
-  } catch (error: any) {
-    // Surface the real Gemini/model error clearly in development — never silently mask it.
-    console.error(
-      `Gemini analysis failed (model="${GEMINI_MODEL}") — falling back to heuristic. Reason:`,
-      error?.message || error
-    );
+  } catch (error: unknown) {
+    // Never log raw prompts, responses, evidence, or error bodies. Structured, type-only metadata only.
+    const timedOut = error instanceof GeminiTimeoutError;
+    logEvent({
+      event: timedOut ? "gemini_analysis_timeout" : "gemini_analysis_error",
+      level: "warn",
+      route: "gemini.analyzeFraudCase",
+      ...(timedOut ? {} : { errorType: safeErrorType(error) }),
+      meta: timedOut
+        ? { reason: "gemini_timeout", timeoutMs, mode: "heuristic" }
+        : { reason: "gemini_error", mode: "heuristic" },
+    });
     return generateHeuristicMockAnalysis(caseTitle, caseDescription, evidenceItems);
   }
 }
@@ -239,6 +301,7 @@ export function generateHeuristicMockAnalysis(
   ];
 
   return {
+    analysisProvider: "heuristic",
     scamCategory: category,
     confidence: score > 50 ? "high" : "medium",
     riskScore: score,
