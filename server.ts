@@ -11,6 +11,7 @@ import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
 import { validateUploadedFile } from "./src/lib/security/fileValidation";
+import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import {
   isCaseOwner,
   buildCaseUpdatePayload,
@@ -387,7 +388,7 @@ async function startServer() {
       };
       next();
     } catch (err: any) {
-      console.error("Token verification failed:", err);
+      logEvent({ event: "token_verify_failed", level: "error", errorType: safeErrorType(err) });
       res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
   }
@@ -412,7 +413,7 @@ async function startServer() {
       req.user = { uid: decodedToken.uid, email: decodedToken.email };
       next();
     } catch (err: any) {
-      console.error("Admin token verification failed:", err);
+      logEvent({ event: "admin_token_verify_failed", level: "error", errorType: safeErrorType(err) });
       res.status(401).json({ error: "Unauthorized: Invalid or expired token" });
     }
   }
@@ -446,7 +447,7 @@ async function startServer() {
 
       res.json(cases);
     } catch (err: any) {
-      console.error("Fetch cases error:", err);
+      logRouteError("fetch_cases", "/api/cases", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -470,7 +471,7 @@ async function startServer() {
 
       res.json({ id: doc.id, ...caseData });
     } catch (err: any) {
-      console.error("Fetch specific case error:", err);
+      logRouteError("fetch_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -494,7 +495,7 @@ async function startServer() {
 
       res.json({ id: doc.id, ...caseData });
     } catch (err: any) {
-      console.error("Fetch case report error:", err);
+      logRouteError("fetch_case_report", "/api/cases/:id/report", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -524,7 +525,7 @@ async function startServer() {
       await adminDb.collection("cases").doc(caseId).set(newCase);
       res.status(201).json(newCase);
     } catch (err: any) {
-      console.error("Create case error:", err);
+      logRouteError("create_case", "/api/cases", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -588,7 +589,7 @@ async function startServer() {
       await docRef.update(updates);
       res.status(201).json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("Add evidence error:", err);
+      logRouteError("add_evidence", "/api/cases/:id/evidence", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -688,7 +689,7 @@ async function startServer() {
         gcsSuccess = true;
         console.log(`Evidence stored in Cloud Storage: ${storagePath}`);
       } catch (gcsErr: any) {
-        console.warn("Cloud Storage upload failed:", gcsErr.message);
+        logEvent({ event: "gcs_upload_failed", level: "warn", errorType: safeErrorType(gcsErr) });
       }
 
       if (gcsSuccess) {
@@ -709,7 +710,7 @@ async function startServer() {
           storageProvider = "local-dev";
           console.warn(`[DEV-ONLY] Cloud Storage unavailable — evidence stored locally (provider=local-dev): ${storagePath}`);
         } catch (localErr: any) {
-          console.error("Dev-only local storage failed:", localErr);
+          logEvent({ event: "dev_local_storage_failed", level: "error", errorType: safeErrorType(localErr) });
           res.status(500).json({ error: "Could not store the evidence file." });
           return;
         }
@@ -753,7 +754,7 @@ async function startServer() {
       await docRef.update(updates);
       res.status(201).json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("File upload evidence error:", err);
+      logRouteError("upload_evidence", "/api/cases/:id/evidence/upload", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -824,7 +825,7 @@ async function startServer() {
         if (exists) {
           const readStream = fileRef.createReadStream();
           readStream.on("error", (streamErr) => {
-            console.error("Cloud Storage stream error.", streamErr);
+            logEvent({ event: "gcs_stream_error", level: "error", route: "/api/cases/:id/evidence/:evidenceId/file", errorType: safeErrorType(streamErr) });
             if (!res.headersSent) {
               res.status(502).json({ error: "Could not stream the stored evidence file." });
             } else {
@@ -835,14 +836,14 @@ async function startServer() {
           served = true;
         }
       } catch (gcsStreamErr) {
-        console.warn("Could not query Cloud Storage object.", gcsStreamErr);
+        logEvent({ event: "gcs_query_failed", level: "warn", errorType: safeErrorType(gcsStreamErr) });
       }
 
       if (!served) {
         res.status(404).json({ error: "The evidence file could not be located in Cloud Storage." });
       }
     } catch (err: any) {
-      console.error("Secure file retrieval error:", err);
+      logRouteError("get_evidence_file", "/api/cases/:id/evidence/:evidenceId/file", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -907,7 +908,7 @@ async function startServer() {
             console.log(`Deleted ${targetItem.storagePath} from GCS`);
           }
         } catch (gcsDeleteErr) {
-          console.warn("Could not purge GCS bytes:", gcsDeleteErr);
+          logEvent({ event: "gcs_purge_failed", level: "warn", errorType: safeErrorType(gcsDeleteErr) });
         }
 
         // 2. Purge from local workspace backup
@@ -930,7 +931,7 @@ async function startServer() {
             }
           }
         } catch (localDeleteErr) {
-          console.warn("Could not purge local file fallback:", localDeleteErr);
+          logEvent({ event: "local_purge_failed", level: "warn", errorType: safeErrorType(localDeleteErr) });
         }
       }
 
@@ -948,7 +949,7 @@ async function startServer() {
       await docRef.update(updates);
       res.json({ id, ...caseData, ...updates });
     } catch (err: any) {
-      console.error("Delete evidence error:", err);
+      logRouteError("delete_evidence", "/api/cases/:id/evidence/:evidenceId", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -987,11 +988,11 @@ async function startServer() {
         await docRef.update(updates);
         res.json({ id, ...caseData, ...updates });
       } catch (err: any) {
-        console.error("Analysis execution error: ", err);
+        logEvent({ event: "analyze_execution_error", level: "error", route: "/api/cases/:id/analyze", errorType: safeErrorType(err) });
         res.status(500).json({ error: "Could not analyze evidence due to processing issues." });
       }
     } catch (err: any) {
-      console.error("Analyze case wrapper error:", err);
+      logRouteError("analyze_case", "/api/cases/:id/analyze", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1017,7 +1018,7 @@ async function startServer() {
       await docRef.delete();
       res.json({ success: true, message: "Case successfully destroyed." });
     } catch (err: any) {
-      console.error("Delete case error:", err);
+      logRouteError("delete_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1044,7 +1045,7 @@ async function startServer() {
       await docRef.update({ ...updates, updatedAt });
       res.json({ id, ...caseData, ...updates, updatedAt });
     } catch (err: any) {
-      console.error("Update case error:", err);
+      logRouteError("update_case", "/api/cases/:id", err);
       res.status(500).json({ error: err.message });
     }
   };
@@ -1076,7 +1077,7 @@ async function startServer() {
       await batch.commit();
       res.json({ success: true, message: "Demo cases imported successfully." });
     } catch (err: any) {
-      console.error("Seed demo cases error:", err);
+      logRouteError("seed_cases", "/api/cases/seed", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1096,7 +1097,7 @@ async function startServer() {
       const result = await buildQuickCheckResult(text);
       res.json(result);
     } catch (err: any) {
-      console.error("Quick Check analyze error:", err);
+      logRouteError("quick_check_analyze", "/api/quick-check/analyze", err);
       res.status(500).json({ error: "Could not complete the Quick Check. Please try again." });
     }
   });
@@ -1138,7 +1139,7 @@ async function startServer() {
       const result = await buildQuickCheckResult(rawText);
       res.json(result);
     } catch (err: any) {
-      console.error("Quick Check upload analyze error:", err);
+      logRouteError("quick_check_analyze_file", "/api/quick-check/analyze-file", err);
       res.status(500).json({ error: "Could not complete the Quick Check upload. Please try again." });
     }
   });
@@ -1209,7 +1210,7 @@ async function startServer() {
       await adminDb.collection("communitySignals").doc(signalId).set(signal);
       res.status(201).json({ success: true });
     } catch (err: any) {
-      console.error("Submit community signal error:", err);
+      logRouteError("submit_signal", "/api/quick-check/submit-signal", err);
       res.status(500).json({ error: "Could not submit the signal. Please try again." });
     }
   });
@@ -1254,7 +1255,7 @@ async function startServer() {
 
       res.json({ stats, signals: list });
     } catch (err: any) {
-      console.error("List community signals error:", err);
+      logRouteError("list_signals", "/api/admin/community-signals", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1297,7 +1298,7 @@ async function startServer() {
       const updated = await ref.get();
       res.json({ id: updated.id, ...updated.data() });
     } catch (err: any) {
-      console.error("Update community signal error:", err);
+      logRouteError("update_signal", "/api/admin/community-signals/:id", err);
       res.status(500).json({ error: err.message });
     }
   });
@@ -1330,9 +1331,9 @@ async function startServer() {
 // without Application Default Credentials) from terminating the process. Public, unauthenticated
 // endpoints must never be able to crash the server via an unhandled rejection.
 process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled promise rejection:", reason);
+  logEvent({ event: "unhandled_rejection", level: "error", errorType: safeErrorType(reason) });
 });
 
 startServer().catch((error) => {
-  console.error("Critical: Failed to boot custom Express + Vite server:", error);
+  logEvent({ event: "server_boot_failed", level: "error", errorType: safeErrorType(error) });
 });
