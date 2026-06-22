@@ -15,6 +15,7 @@ import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
 import { createCaptchaMiddleware } from "./src/lib/security/captcha";
+import { makeRequestTimeout } from "./src/lib/security/requestTimeout";
 import {
   isCaseOwner,
   buildCaseUpdatePayload,
@@ -86,6 +87,10 @@ const verifyAppCheck = createAppCheckMiddleware();
 // CAPTCHA / Turnstile human attestation for public routes. DEFAULT-OFF: passes through unless
 // CAPTCHA_ENFORCE=true (and CAPTCHA_SECRET_KEY is provisioned). No secret is committed.
 const verifyCaptcha = createCaptchaMiddleware();
+
+// Per-request timeout for expensive public (Gemini-backed) routes. Returns a calm 503 if a
+// request hangs, so a slow upstream cannot hold the connection open. Does not abort upstream work.
+const publicAnalyzeTimeout = makeRequestTimeout(20000);
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
 // demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
@@ -207,11 +212,17 @@ async function startServer() {
   // Content-Length. Those endpoints only need a few KB; the 15mb limit below still covers the
   // authenticated routes. Returns a calm JSON error, never a stack trace.
   const PUBLIC_TEXT_PATHS = new Set(["/api/quick-check/analyze", "/api/quick-check/submit-signal"]);
+  const PUBLIC_FILE_PATH = "/api/quick-check/analyze-file";
+  const PUBLIC_FILE_MAX_BYTES = 6 * 1024 * 1024; // 5MB file + multipart overhead; multer enforces the hard 5MB cap
   app.use((req: any, res: any, next: any) => {
-    if (req.method === "POST" && PUBLIC_TEXT_PATHS.has(req.path)) {
+    if (req.method === "POST") {
       const declared = Number(req.headers["content-length"] || 0);
-      if (declared > PUBLIC_JSON_MAX_BYTES) {
+      if (PUBLIC_TEXT_PATHS.has(req.path) && declared > PUBLIC_JSON_MAX_BYTES) {
         res.status(413).json({ error: "Request too large. Paste the message text instead of a large payload." });
+        return;
+      }
+      if (req.path === PUBLIC_FILE_PATH && declared > PUBLIC_FILE_MAX_BYTES) {
+        res.status(413).json({ error: "File too large. The maximum upload is 5MB." });
         return;
       }
     }
@@ -1026,7 +1037,7 @@ async function startServer() {
   // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
   // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
   // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
-  app.post("/api/quick-check/analyze", verifyAppCheck, verifyCaptcha, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
     try {
       const { text } = req.body || {};
       if (!text || typeof text !== "string" || !text.trim()) {
@@ -1047,7 +1058,7 @@ async function startServer() {
   // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
   // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
   // handler intentionally has no Firestore/Storage/disk write path.
-  app.post("/api/quick-check/analyze-file", verifyAppCheck, verifyCaptcha, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
+  app.post("/api/quick-check/analyze-file", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "Attach a .txt, .csv, .json, or .html file to run a Quick Check." });
@@ -1262,10 +1273,13 @@ async function startServer() {
     });
   }
 
-  // Launch service
-  app.listen(PORT, HOST, () => {
+  // Launch service. Capture the server to apply production request/header timeouts
+  // (slow-loris / hung-request guard). Generous so legitimate uploads are unaffected.
+  const server = app.listen(PORT, HOST, () => {
     console.log(`FraudCase GH [Fullstack Service] listening at http://${HOST}:${PORT}`);
   });
+  server.requestTimeout = 120000;
+  server.headersTimeout = 65000;
 }
 
 // Prevent a rejected background promise (e.g. a Firebase Admin credential lookup when running
