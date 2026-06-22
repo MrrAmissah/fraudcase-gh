@@ -419,6 +419,16 @@ async function startServer() {
 
   // --- API ROUTES ---
 
+  // Liveness/health check for deploy platforms and uptime monitors. Public, no auth.
+  // Returns only safe, non-sensitive fields: never env values, versions, secrets, or paths.
+  app.get("/api/health", (_req: any, res: any) => {
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+    });
+  });
+
   // Get all cases owned by the authenticated user
   app.get("/api/cases", requireAuth, async (req: any, res: any) => {
     try {
