@@ -5,6 +5,7 @@ import {
   resolveExtractionKind,
   resolveSourceType,
   runEvidenceExtraction,
+  buildExtractedEvidenceItem,
 } from "../extractionPipeline";
 
 const owned = { ownerId: "owner-1" };
@@ -114,6 +115,29 @@ test("runEvidenceExtraction: no model (client null) audits a failed run, no arti
   assert.equal(res.run.status, "failed");
   assert.equal(res.run.redactionStatus, "not_applied");
   assert.equal(res.artifact, undefined);
+});
+
+test("buildExtractedEvidenceItem: KEYSTONE - never writes OCR into redactedText", async () => {
+  const res = await runEvidenceExtraction({
+    buffer: Buffer.from("x"),
+    mimeType: "image/png",
+    kind: "image",
+    context: ctx,
+    consentRecordedAt: "2026-06-23T00:00:00Z",
+    runId: "run-k",
+    opts: { client: okClient as any },
+  });
+  // Item with NO redactedText: the builder must not introduce one (OCR lives only in the artifact).
+  const bare = { id: "img-1", caseId: "c1", type: "receipt", title: "x", createdAt: "2026-06-23T00:00:00Z" };
+  const out = buildExtractedEvidenceItem(bare, res, "run-k");
+  assert.ok(!("redactedText" in out), "extraction must never add redactedText");
+  assert.equal(out.extractionStatus, "extracted");
+  assert.ok((out as any).extractedArtifact, "OCR is carried only in extractedArtifact");
+
+  // Item WITH a pre-existing upload placeholder: it is preserved unchanged, not overwritten with OCR.
+  const placeholder = { ...bare, redactedText: "[File Attachment: receipt.png · image/png]" };
+  const out2 = buildExtractedEvidenceItem(placeholder, res, "run-k");
+  assert.equal(out2.redactedText, "[File Attachment: receipt.png · image/png]");
 });
 
 test("runEvidenceExtraction: timeout audits a timeout run, no artifact", async () => {

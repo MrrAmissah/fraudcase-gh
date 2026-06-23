@@ -161,3 +161,29 @@ export async function runEvidenceExtraction(params: RunExtractionParams): Promis
   };
   return { run, status: outcome.status };
 }
+
+/**
+ * Assemble the updated evidence item after an extraction attempt. KEYSTONE INVARIANT: this only
+ * sets extraction-specific fields and the redacted `extractedArtifact`; it never writes or overwrites
+ * `redactedText`/`originalText`/`extractedText`, so the case analyzer (which reads those) can never
+ * auto-include extracted OCR text. Any existing placeholder text on the item is preserved as-is.
+ */
+export function buildExtractedEvidenceItem<T extends Record<string, unknown>>(
+  item: T,
+  result: RunExtractionResult,
+  runId: string,
+): T & Record<string, unknown> {
+  const evStatus = result.status === "succeeded" ? "extracted" : result.status === "timeout" ? "timeout" : "failed";
+  const updated: Record<string, unknown> = {
+    ...item,
+    extractionStatus: evStatus,
+    extractionProvider: result.run.provider,
+    latestExtractionRunId: runId,
+  };
+  if (result.artifact) {
+    updated.extractedArtifact = result.artifact;
+    updated.requiresHumanReview = result.artifact.requiresHumanReview;
+    updated.privacyFlags = result.artifact.privacyFlags;
+  }
+  return updated as T & Record<string, unknown>;
+}

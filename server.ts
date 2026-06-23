@@ -17,6 +17,7 @@ import {
   resolveExtractionKind,
   resolveSourceType,
   runEvidenceExtraction,
+  buildExtractedEvidenceItem,
 } from "./src/lib/extraction/extractionPipeline";
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { applyFactVerification } from "./src/lib/extraction/verification";
@@ -1014,23 +1015,12 @@ async function startServer() {
       // Always persist the audit run (succeeded/failed/timeout) — never any text/prompt/response.
       await docRef.collection("extractionRuns").doc(runId).set(result.run);
 
-      // Update only the extraction fields on the evidence item. redactedText/originalText/extractedText
-      // are intentionally left untouched so the case analyzer never auto-includes extracted text.
-      const evStatus = result.status === "succeeded" ? "extracted" : result.status === "timeout" ? "timeout" : "failed";
+      // Update only the extraction fields on the evidence item via the keystone-guarded builder.
+      // redactedText/originalText/extractedText are never written here, so the case analyzer cannot
+      // auto-include extracted OCR text.
       const idx = items.findIndex((e: any) => e.id === evidenceId);
-      const updatedItem: any = {
-        ...items[idx],
-        extractionStatus: evStatus,
-        extractionProvider: result.run.provider,
-        latestExtractionRunId: runId,
-      };
-      if (result.artifact) {
-        updatedItem.extractedArtifact = result.artifact;
-        updatedItem.requiresHumanReview = result.artifact.requiresHumanReview;
-        updatedItem.privacyFlags = result.artifact.privacyFlags;
-      }
       const updatedItems = [...items];
-      updatedItems[idx] = updatedItem;
+      updatedItems[idx] = buildExtractedEvidenceItem(items[idx], result, runId);
       await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
 
       logEvent({
