@@ -20,7 +20,8 @@ import {
 
 const DEFAULT_EXTRACTION_TIMEOUT_MS = 30000;
 
-function modelId(): string {
+/** Model id used for extraction; overridable via GEMINI_MODEL. Read at call time. */
+export function extractionModelId(): string {
   return process.env.GEMINI_MODEL || "gemini-3.5-flash";
 }
 
@@ -144,7 +145,7 @@ export async function extractVisualEvidence(
   try {
     const response = await withTimeout(
       client.models.generateContent({
-        model: modelId(),
+        model: extractionModelId(),
         contents: [
           { inlineData: { mimeType: input.mimeType, data: input.buffer.toString("base64") } },
           buildExtractionPrompt(input.kind),
