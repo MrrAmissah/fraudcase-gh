@@ -14,7 +14,7 @@ Gemini powers Quick Check analysis and (Sprint 3+) private multimodal extraction
 | `POST /api/quick-check/analyze` | Text generation | Medium (public, high volume) |
 | `POST /api/quick-check/analyze-file` | Multimodal (when enabled) | High |
 | `POST /api/cases/:id/analyze` | Text case analysis | Medium |
-| Future `POST .../evidence/extract` | Image/PDF extraction | High |
+| `POST /api/cases/:id/evidence/:evidenceId/extract` | Image/PDF multimodal extraction (private, consent-gated, behind `MULTIMODAL_EXTRACTION_ENABLED`) | High |
 
 Mitigations stack: **rate limits → App Check → quotas → billing alerts → circuit breaker**.
 
@@ -79,6 +79,8 @@ Log structured events (no content):
 | `GEMINI_MODEL` | Optional override (default `gemini-3.5-flash`) |
 | `GEMINI_MAX_DAILY_REQUESTS` | Optional app-level cap (Sprint 2) |
 | `GEMINI_ANALYSIS_TIMEOUT_MS` | Optional per-call analysis timeout (ms); default 15000; slow Gemini falls back to the heuristic |
+| `MULTIMODAL_EXTRACTION_ENABLED` | Master switch for private image/PDF extraction (Sprint 3). Default off; only `true` enables. |
+| `MULTIMODAL_EXTRACTION_TIMEOUT_MS` | Optional per-call extraction timeout (ms); default 30000 |
 
 Never expose `GEMINI_API_KEY` to the client.
 
