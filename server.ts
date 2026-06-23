@@ -10,7 +10,18 @@ import { QuickCheckResult } from "./src/types/quickCheck";
 import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
-import { validateUploadedFile } from "./src/lib/security/fileValidation";
+import { validateUploadedFile, detectFileKind } from "./src/lib/security/fileValidation";
+import {
+  evaluateExtractionPreconditions,
+  EXTRACTION_DECISION_HTTP,
+  resolveExtractionKind,
+  resolveSourceType,
+  runEvidenceExtraction,
+  buildExtractedEvidenceItem,
+} from "./src/lib/extraction/extractionPipeline";
+import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
+import { applyFactVerification } from "./src/lib/extraction/verification";
+import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems } from "./src/lib/extraction/sourceMapping";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
@@ -907,6 +918,201 @@ async function startServer() {
     }
   });
 
+  // --- PRIVATE MULTIMODAL EVIDENCE EXTRACTION (Sprint 3) ---
+  // Consent-gated, owner-isolated, env-flag-gated (default off). Reads the raw bytes SERVER-SIDE
+  // from the owner's private storage path (never a client URL), runs pass A extraction, redacts,
+  // and persists ONLY the redacted artifact (embedded) + an audit run (subcollection). Raw OCR text
+  // stays in request memory and is never written or logged. Extracted facts are suggestions until
+  // the owner accepts them — see the verification route and the analysis integration.
+  function detectedKindToMime(kind: "png" | "jpeg" | "pdf" | "webp" | "text" | "unknown"): string {
+    if (kind === "png") return "image/png";
+    if (kind === "jpeg") return "image/jpeg";
+    if (kind === "pdf") return "application/pdf";
+    return "application/octet-stream";
+  }
+
+  app.post("/api/cases/:id/evidence/:evidenceId/extract", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id, evidenceId } = req.params;
+      const { consentGiven } = req.body || {};
+
+      const docRef = adminDb.collection("cases").doc(id);
+      const doc = await docRef.get();
+      const caseData = doc.exists ? doc.data() : null;
+      const items = (caseData?.evidenceItems || []) as any[];
+      const evidenceItem = items.find((e: any) => e.id === evidenceId) || null;
+
+      // Gate order: flag -> ownership -> evidence exists -> consent. Consent is checked BEFORE any
+      // file bytes are read, so an unconsented request never touches storage.
+      const decision = evaluateExtractionPreconditions({
+        flagEnabled: isMultimodalExtractionEnabled(),
+        caseData,
+        evidenceItem,
+        uid: req.user.uid,
+        consentGiven,
+      });
+      if (decision !== "proceed") {
+        const mapped = EXTRACTION_DECISION_HTTP[decision];
+        res.status(mapped.status).json({ error: mapped.error });
+        return;
+      }
+
+      // Locate the stored bytes using the same provider logic as the download proxy.
+      const provider = evidenceItem.storageProvider || (evidenceItem.storagePath ? "gcs" : "local-dev");
+      let buffer: Buffer;
+      try {
+        if (provider === "local-dev") {
+          if (!evidenceItem.fileName) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          const localFilePath = path.join(process.cwd(), "secure_uploads", req.user.uid, id, evidenceId, evidenceItem.fileName);
+          if (!fs.existsSync(localFilePath)) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          buffer = fs.readFileSync(localFilePath);
+        } else {
+          if (!evidenceItem.storagePath) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          const [bytes] = await adminStorage.bucket().file(evidenceItem.storagePath).download();
+          buffer = bytes;
+        }
+      } catch (readErr: any) {
+        logEvent({ event: "extract_storage_read_failed", level: "warn", errorType: safeErrorType(readErr) });
+        res.status(502).json({ error: "Could not read the stored evidence file." });
+        return;
+      }
+
+      // Re-validate the REAL bytes (do not trust the stored fileType). MVP supports PNG/JPEG/PDF only.
+      const detectedKind = detectFileKind(buffer);
+      const kind = resolveExtractionKind(detectedKind);
+      if (!kind) {
+        res.status(415).json({ error: "Only PNG, JPEG, or PDF evidence can be extracted." });
+        return;
+      }
+
+      const runId = `xr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const consentRecordedAt = new Date().toISOString();
+      const sourceType = resolveSourceType(evidenceItem.type, kind);
+
+      const result = await runEvidenceExtraction({
+        buffer,
+        mimeType: detectedKindToMime(detectedKind),
+        kind,
+        context: {
+          evidenceId,
+          ownerId: resolveOwnerIdFromToken(req.user.uid),
+          caseId: id,
+          sourceType,
+        },
+        consentRecordedAt,
+        runId,
+      });
+
+      // Always persist the audit run (succeeded/failed/timeout) — never any text/prompt/response.
+      await docRef.collection("extractionRuns").doc(runId).set(result.run);
+
+      // Update only the extraction fields on the evidence item via the keystone-guarded builder.
+      // redactedText/originalText/extractedText are never written here, so the case analyzer cannot
+      // auto-include extracted OCR text.
+      const idx = items.findIndex((e: any) => e.id === evidenceId);
+      const updatedItems = [...items];
+      updatedItems[idx] = buildExtractedEvidenceItem(items[idx], result, runId);
+      await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
+
+      logEvent({
+        event: "evidence_extracted",
+        route: "/api/cases/:id/evidence/:evidenceId/extract",
+        meta: { status: result.status, factCount: result.run.factCount ?? 0 },
+      });
+
+      if (result.status === "succeeded") {
+        res.status(201).json({ evidenceId, extractionRunId: runId, artifact: result.artifact });
+      } else if (result.status === "skipped") {
+        res.status(503).json({ error: "Multimodal extraction is currently unavailable." });
+      } else if (result.status === "timeout") {
+        res.status(503).json({ error: "Extraction timed out. Please try again." });
+      } else {
+        res.status(502).json({ error: "Extraction could not be completed. Please try again." });
+      }
+    } catch (err: any) {
+      logRouteError("extract_evidence", "/api/cases/:id/evidence/:evidenceId/extract", err);
+      res.status(500).json({ error: "Could not extract this evidence." });
+    }
+  });
+
+  // Accept or Reject a single extracted fact (thin Sprint 3 verification path). Only accepted facts
+  // become trusted analysis input; rejection excludes a fact. Owner-isolated; notes are redacted.
+  app.patch("/api/cases/:id/evidence/:evidenceId/facts/:factId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id, evidenceId, factId } = req.params;
+      const { decision, verificationNotes } = req.body || {};
+      if (decision !== "accept" && decision !== "reject") {
+        res.status(400).json({ error: "decision must be 'accept' or 'reject'." });
+        return;
+      }
+
+      const docRef = adminDb.collection("cases").doc(id);
+      const doc = await docRef.get();
+      if (!doc.exists) {
+        res.status(404).json({ error: "Fraud case target not found." });
+        return;
+      }
+      const caseData = doc.data();
+      if (!isCaseOwner(caseData, req.user.uid)) {
+        res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
+        return;
+      }
+
+      const items = (caseData.evidenceItems || []) as any[];
+      const idx = items.findIndex((e: any) => e.id === evidenceId);
+      if (idx < 0) {
+        res.status(404).json({ error: "Evidence item not found." });
+        return;
+      }
+
+      const notesRedacted = verificationNotes
+        ? redactPIIAndSecrets(String(verificationNotes).slice(0, 1000)).redactedText
+        : undefined;
+
+      const result = applyFactVerification({
+        artifact: items[idx].extractedArtifact,
+        factId,
+        decision,
+        uid: req.user.uid,
+        notesRedacted,
+      });
+      if (!result.ok) {
+        const status = result.reason === "invalid_decision" ? 400 : 404;
+        const message =
+          result.reason === "no_artifact"
+            ? "This evidence has no extracted facts to verify."
+            : result.reason === "fact_not_found"
+              ? "Extracted fact not found."
+              : "decision must be 'accept' or 'reject'.";
+        res.status(status).json({ error: message });
+        return;
+      }
+
+      const updatedItems = [...items];
+      updatedItems[idx] = { ...items[idx], extractedArtifact: result.artifact };
+      await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
+
+      res.json({
+        evidenceId,
+        factId,
+        verificationStatus: result.fact.verificationStatus,
+        verifiedByUser: result.fact.verifiedByUser,
+      });
+    } catch (err: any) {
+      logRouteError("verify_fact", "/api/cases/:id/evidence/:evidenceId/facts/:factId", err);
+      res.status(500).json({ error: "Could not update the extracted fact." });
+    }
+  });
+
   // Trigger Gemini-assisted Structured Evidence Analysis
   app.post("/api/cases/:id/analyze", requireAuth, async (req: any, res: any) => {
     try {
@@ -926,10 +1132,17 @@ async function startServer() {
       }
 
       try {
+        // Pass B trusts only user-accepted extracted facts. The case's existing text evidence is
+        // passed as-is (image/PDF items carry no redactedText, so they contribute nothing on their
+        // own), and accepted facts are appended as synthetic redacted items. Unaccepted suggestions
+        // and rejected facts never reach the analyzer.
+        const acceptedFactItems = bundleToAnalysisEvidenceItems(
+          buildAnalysisInputBundle(id, req.user.uid, caseData.evidenceItems || []),
+        );
         const analysisResult = await analyzeFraudCase(
           caseData.title || "",
           caseData.description || "",
-          caseData.evidenceItems || []
+          [...(caseData.evidenceItems || []), ...acceptedFactItems]
         );
 
         const updates = {

@@ -5,7 +5,9 @@
 **Parent:** [`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md) (Sprint 3 row)
 **Related:** [`PRODUCTION_DEFINITION_OF_DONE.md`](./PRODUCTION_DEFINITION_OF_DONE.md) §4, [`AGENT_PLAYBOOK.md`](./AGENT_PLAYBOOK.md), [`research/2026-06-21-fraudcase-multimodal-evidence-research.md`](./research/2026-06-21-fraudcase-multimodal-evidence-research.md), [`research/2026-06-21-ai-studio-multimodal-feedback.md`](./research/2026-06-21-ai-studio-multimodal-feedback.md), [`GEMINI_QUOTA_AND_BILLING.md`](./GEMINI_QUOTA_AND_BILLING.md)
 
-This document plans Sprint 3 only. It does not implement anything. The pipeline must not be built until implementation is approved.
+This document plans Sprint 3. It does not implement anything by itself.
+
+**Implementation status (2026-06-23):** the Sprint 3 backend pipeline is implemented behind `MULTIMODAL_EXTRACTION_ENABLED` (default off) on branch `sprint-3-multimodal-pipeline`: extraction types/schema/prompts, deterministic grounding, redacted-artifact builder, the Gemini extractor, the consent-gated extract endpoint with bounded persistence and an `extractionRuns` subcollection, the thin Accept/Reject verification path, accepted-facts-only analysis integration, and the privacy/injection/owner-isolation/fallback test suite. No frontend ships in this PR: consent is collected at the API level only, which is one reason the feature stays default-off (it is not yet user-reachable). The full verification workspace is Sprint 4.
 
 Repo baseline at planning time: `main` at `ceb69ad`; Sprint 2 backend hardening merged; CI and Security green; Firebase web key rotation fully closed; follow-up issues #7 to #12 open.
 
