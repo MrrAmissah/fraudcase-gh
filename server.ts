@@ -20,6 +20,7 @@ import {
 } from "./src/lib/extraction/extractionPipeline";
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { applyFactVerification } from "./src/lib/extraction/verification";
+import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems } from "./src/lib/extraction/sourceMapping";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
@@ -1141,10 +1142,17 @@ async function startServer() {
       }
 
       try {
+        // Pass B trusts only user-accepted extracted facts. The case's existing text evidence is
+        // passed as-is (image/PDF items carry no redactedText, so they contribute nothing on their
+        // own), and accepted facts are appended as synthetic redacted items. Unaccepted suggestions
+        // and rejected facts never reach the analyzer.
+        const acceptedFactItems = bundleToAnalysisEvidenceItems(
+          buildAnalysisInputBundle(id, req.user.uid, caseData.evidenceItems || []),
+        );
         const analysisResult = await analyzeFraudCase(
           caseData.title || "",
           caseData.description || "",
-          caseData.evidenceItems || []
+          [...(caseData.evidenceItems || []), ...acceptedFactItems]
         );
 
         const updates = {
