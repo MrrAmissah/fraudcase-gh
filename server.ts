@@ -10,7 +10,15 @@ import { QuickCheckResult } from "./src/types/quickCheck";
 import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
-import { validateUploadedFile } from "./src/lib/security/fileValidation";
+import { validateUploadedFile, detectFileKind } from "./src/lib/security/fileValidation";
+import {
+  evaluateExtractionPreconditions,
+  EXTRACTION_DECISION_HTTP,
+  resolveExtractionKind,
+  resolveSourceType,
+  runEvidenceExtraction,
+} from "./src/lib/extraction/extractionPipeline";
+import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
@@ -904,6 +912,143 @@ async function startServer() {
     } catch (err: any) {
       logRouteError("delete_evidence", "/api/cases/:id/evidence/:evidenceId", err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- PRIVATE MULTIMODAL EVIDENCE EXTRACTION (Sprint 3) ---
+  // Consent-gated, owner-isolated, env-flag-gated (default off). Reads the raw bytes SERVER-SIDE
+  // from the owner's private storage path (never a client URL), runs pass A extraction, redacts,
+  // and persists ONLY the redacted artifact (embedded) + an audit run (subcollection). Raw OCR text
+  // stays in request memory and is never written or logged. Extracted facts are suggestions until
+  // the owner accepts them — see the verification route and the analysis integration.
+  function detectedKindToMime(kind: "png" | "jpeg" | "pdf" | "webp" | "text" | "unknown"): string {
+    if (kind === "png") return "image/png";
+    if (kind === "jpeg") return "image/jpeg";
+    if (kind === "pdf") return "application/pdf";
+    return "application/octet-stream";
+  }
+
+  app.post("/api/cases/:id/evidence/:evidenceId/extract", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id, evidenceId } = req.params;
+      const { consentGiven } = req.body || {};
+
+      const docRef = adminDb.collection("cases").doc(id);
+      const doc = await docRef.get();
+      const caseData = doc.exists ? doc.data() : null;
+      const items = (caseData?.evidenceItems || []) as any[];
+      const evidenceItem = items.find((e: any) => e.id === evidenceId) || null;
+
+      // Gate order: flag -> ownership -> evidence exists -> consent. Consent is checked BEFORE any
+      // file bytes are read, so an unconsented request never touches storage.
+      const decision = evaluateExtractionPreconditions({
+        flagEnabled: isMultimodalExtractionEnabled(),
+        caseData,
+        evidenceItem,
+        uid: req.user.uid,
+        consentGiven,
+      });
+      if (decision !== "proceed") {
+        const mapped = EXTRACTION_DECISION_HTTP[decision];
+        res.status(mapped.status).json({ error: mapped.error });
+        return;
+      }
+
+      // Locate the stored bytes using the same provider logic as the download proxy.
+      const provider = evidenceItem.storageProvider || (evidenceItem.storagePath ? "gcs" : "local-dev");
+      let buffer: Buffer;
+      try {
+        if (provider === "local-dev") {
+          if (!evidenceItem.fileName) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          const localFilePath = path.join(process.cwd(), "secure_uploads", req.user.uid, id, evidenceId, evidenceItem.fileName);
+          if (!fs.existsSync(localFilePath)) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          buffer = fs.readFileSync(localFilePath);
+        } else {
+          if (!evidenceItem.storagePath) {
+            res.status(409).json({ error: "This evidence has no stored file to extract." });
+            return;
+          }
+          const [bytes] = await adminStorage.bucket().file(evidenceItem.storagePath).download();
+          buffer = bytes;
+        }
+      } catch (readErr: any) {
+        logEvent({ event: "extract_storage_read_failed", level: "warn", errorType: safeErrorType(readErr) });
+        res.status(502).json({ error: "Could not read the stored evidence file." });
+        return;
+      }
+
+      // Re-validate the REAL bytes (do not trust the stored fileType). MVP supports PNG/JPEG/PDF only.
+      const detectedKind = detectFileKind(buffer);
+      const kind = resolveExtractionKind(detectedKind);
+      if (!kind) {
+        res.status(415).json({ error: "Only PNG, JPEG, or PDF evidence can be extracted." });
+        return;
+      }
+
+      const runId = `xr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const consentRecordedAt = new Date().toISOString();
+      const sourceType = resolveSourceType(evidenceItem.type, kind);
+
+      const result = await runEvidenceExtraction({
+        buffer,
+        mimeType: detectedKindToMime(detectedKind),
+        kind,
+        context: {
+          evidenceId,
+          ownerId: resolveOwnerIdFromToken(req.user.uid),
+          caseId: id,
+          sourceType,
+        },
+        consentRecordedAt,
+        runId,
+      });
+
+      // Always persist the audit run (succeeded/failed/timeout) — never any text/prompt/response.
+      await docRef.collection("extractionRuns").doc(runId).set(result.run);
+
+      // Update only the extraction fields on the evidence item. redactedText/originalText/extractedText
+      // are intentionally left untouched so the case analyzer never auto-includes extracted text.
+      const evStatus = result.status === "succeeded" ? "extracted" : result.status === "timeout" ? "timeout" : "failed";
+      const idx = items.findIndex((e: any) => e.id === evidenceId);
+      const updatedItem: any = {
+        ...items[idx],
+        extractionStatus: evStatus,
+        extractionProvider: result.run.provider,
+        latestExtractionRunId: runId,
+      };
+      if (result.artifact) {
+        updatedItem.extractedArtifact = result.artifact;
+        updatedItem.requiresHumanReview = result.artifact.requiresHumanReview;
+        updatedItem.privacyFlags = result.artifact.privacyFlags;
+      }
+      const updatedItems = [...items];
+      updatedItems[idx] = updatedItem;
+      await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
+
+      logEvent({
+        event: "evidence_extracted",
+        route: "/api/cases/:id/evidence/:evidenceId/extract",
+        meta: { status: result.status, factCount: result.run.factCount ?? 0 },
+      });
+
+      if (result.status === "succeeded") {
+        res.status(201).json({ evidenceId, extractionRunId: runId, artifact: result.artifact });
+      } else if (result.status === "skipped") {
+        res.status(503).json({ error: "Multimodal extraction is currently unavailable." });
+      } else if (result.status === "timeout") {
+        res.status(503).json({ error: "Extraction timed out. Please try again." });
+      } else {
+        res.status(502).json({ error: "Extraction could not be completed. Please try again." });
+      }
+    } catch (err: any) {
+      logRouteError("extract_evidence", "/api/cases/:id/evidence/:evidenceId/extract", err);
+      res.status(500).json({ error: "Could not extract this evidence." });
     }
   });
 
