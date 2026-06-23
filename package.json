@@ -9,7 +9,7 @@
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/lib/gemini/*.test.ts\" \"src/lib/security/*.test.ts\" \"src/lib/observability/*.test.ts\"",
+    "test": "node --import tsx --test \"src/lib/gemini/*.test.ts\" \"src/lib/security/*.test.ts\" \"src/lib/observability/*.test.ts\" \"src/lib/extraction/__tests__/*.test.ts\"",
     "check:env": "node scripts/check-env.mjs"
   },
   "dependencies": {
