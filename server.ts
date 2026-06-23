@@ -19,6 +19,7 @@ import {
   runEvidenceExtraction,
 } from "./src/lib/extraction/extractionPipeline";
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
+import { applyFactVerification } from "./src/lib/extraction/verification";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
@@ -1049,6 +1050,75 @@ async function startServer() {
     } catch (err: any) {
       logRouteError("extract_evidence", "/api/cases/:id/evidence/:evidenceId/extract", err);
       res.status(500).json({ error: "Could not extract this evidence." });
+    }
+  });
+
+  // Accept or Reject a single extracted fact (thin Sprint 3 verification path). Only accepted facts
+  // become trusted analysis input; rejection excludes a fact. Owner-isolated; notes are redacted.
+  app.patch("/api/cases/:id/evidence/:evidenceId/facts/:factId", requireAuth, async (req: any, res: any) => {
+    try {
+      const { id, evidenceId, factId } = req.params;
+      const { decision, verificationNotes } = req.body || {};
+      if (decision !== "accept" && decision !== "reject") {
+        res.status(400).json({ error: "decision must be 'accept' or 'reject'." });
+        return;
+      }
+
+      const docRef = adminDb.collection("cases").doc(id);
+      const doc = await docRef.get();
+      if (!doc.exists) {
+        res.status(404).json({ error: "Fraud case target not found." });
+        return;
+      }
+      const caseData = doc.data();
+      if (!isCaseOwner(caseData, req.user.uid)) {
+        res.status(403).json({ error: "Forbidden: Access denied to this case resource." });
+        return;
+      }
+
+      const items = (caseData.evidenceItems || []) as any[];
+      const idx = items.findIndex((e: any) => e.id === evidenceId);
+      if (idx < 0) {
+        res.status(404).json({ error: "Evidence item not found." });
+        return;
+      }
+
+      const notesRedacted = verificationNotes
+        ? redactPIIAndSecrets(String(verificationNotes).slice(0, 1000)).redactedText
+        : undefined;
+
+      const result = applyFactVerification({
+        artifact: items[idx].extractedArtifact,
+        factId,
+        decision,
+        uid: req.user.uid,
+        notesRedacted,
+      });
+      if (!result.ok) {
+        const status = result.reason === "invalid_decision" ? 400 : 404;
+        const message =
+          result.reason === "no_artifact"
+            ? "This evidence has no extracted facts to verify."
+            : result.reason === "fact_not_found"
+              ? "Extracted fact not found."
+              : "decision must be 'accept' or 'reject'.";
+        res.status(status).json({ error: message });
+        return;
+      }
+
+      const updatedItems = [...items];
+      updatedItems[idx] = { ...items[idx], extractedArtifact: result.artifact };
+      await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
+
+      res.json({
+        evidenceId,
+        factId,
+        verificationStatus: result.fact.verificationStatus,
+        verifiedByUser: result.fact.verifiedByUser,
+      });
+    } catch (err: any) {
+      logRouteError("verify_fact", "/api/cases/:id/evidence/:evidenceId/facts/:factId", err);
+      res.status(500).json({ error: "Could not update the extracted fact." });
     }
   });
 
