@@ -25,6 +25,7 @@ import SuspiciousIndicators from "../components/SuspiciousIndicators";
 import TimelineView from "../components/TimelineView";
 import EvidenceChecklist from "../components/EvidenceChecklist";
 import AnalysisVisualSummary from "../components/analysis/AnalysisVisualSummary";
+import VerificationWorkspace from "../components/VerificationWorkspace";
 
 interface CaseDetailPageProps {
   fraudCase: FraudCase;
@@ -64,9 +65,29 @@ export default function CaseDetailPage({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [verifyingEvidenceId, setVerifyingEvidenceId] = useState<string | null>(null);
+  const [analysisStale, setAnalysisStale] = useState(false);
   const evidenceFormRef = useRef<HTMLDivElement>(null);
 
   const hasAnalysis = !!analysis;
+
+  // Accepting/rejecting facts changes what analysis WOULD use, but `/analyze` only rebuilds the
+  // accepted-facts bundle when re-run. Surface a stale nudge so the payoff is not invisible.
+  const handleVerifyFactLocal = async (
+    evidenceId: string,
+    factId: string,
+    decision: "accept" | "reject",
+  ) => {
+    await onVerifyFact(evidenceId, factId, decision);
+    if (hasAnalysis) setAnalysisStale(true);
+  };
+  const handleAnalyzeLocal = () => {
+    setAnalysisStale(false);
+    onAnalyze();
+  };
+
+  const verifyingEvidence = verifyingEvidenceId
+    ? evidenceItems.find((e) => e.id === verifyingEvidenceId)
+    : undefined;
   const riskInfo = hasAnalysis ? getRiskLevel(analysis.riskScore) : {
     label: "Awaiting Assessment",
     color: "text-slate-400",
@@ -174,7 +195,7 @@ export default function CaseDetailPage({
             </button>
 
             <button
-              onClick={onAnalyze}
+              onClick={handleAnalyzeLocal}
               disabled={isAnalyzing || evidenceItems.length === 0}
               className="px-3.5 py-2 bg-white hover:bg-slate-50 disabled:bg-slate-50 disabled:border-slate-150 disabled:text-slate-405 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all flex items-center gap-1.5"
               id="reanalyze-shortcut-btn"
@@ -209,6 +230,25 @@ export default function CaseDetailPage({
           <p className="text-[12px] text-slate-500 leading-normal font-sans font-normal pl-5">
             This is a decision-support tool and does not determine guilt or replace official investigation.
           </p>
+        </div>
+      )}
+
+      {/* 2b. Stale-analysis nudge: accepted/rejected facts only affect analysis after a re-run. */}
+      {hasAnalysis && analysisStale && (
+        <div className="bg-amber-50/70 border border-amber-150 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print" id="analysis-stale-banner">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-[12.5px] text-amber-900 font-sans leading-snug">
+              You changed which extracted facts are accepted. Re-analyze to include only your accepted facts.
+            </p>
+          </div>
+          <button
+            onClick={handleAnalyzeLocal}
+            disabled={isAnalyzing}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white rounded-lg text-[11.5px] font-semibold font-sans cursor-pointer transition-colors whitespace-nowrap"
+          >
+            <RefreshCw size={12} className={isAnalyzing ? "animate-spin" : ""} /> Re-analyze
+          </button>
         </div>
       )}
 
@@ -371,7 +411,7 @@ export default function CaseDetailPage({
               </div>
               <button
                 disabled={evidenceItems.length === 0}
-                onClick={onAnalyze}
+                onClick={handleAnalyzeLocal}
                 className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-150 disabled:text-slate-400 text-white text-xs font-sans font-semibold rounded-lg shadow-xs cursor-pointer transition-all"
                 id="workspace-trigger-analysis-btn"
               >
@@ -479,6 +519,16 @@ export default function CaseDetailPage({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Verification workspace (split-screen modal) */}
+      {verifyingEvidence && (
+        <VerificationWorkspace
+          caseId={id}
+          evidence={verifyingEvidence}
+          onClose={() => setVerifyingEvidenceId(null)}
+          onVerifyFact={handleVerifyFactLocal}
+        />
       )}
 
     </div>
