@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.staging.example
 
 # Local evidence file copies written by the upload handler (contains user PII)
 secure_uploads/
