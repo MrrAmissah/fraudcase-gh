@@ -100,6 +100,15 @@ test("rejected facts never reach analysis input", () => {
   assert.equal(bundleToAnalysisEvidenceItems(bundle).length, 0);
 });
 
+test("stale verifiedByUser does not let suggested facts reach analysis input", () => {
+  const items = [imageItem(extractedFact("suggested", true))];
+  const bundle = buildAnalysisInputBundle("c1", "u1", items);
+  assert.equal(bundle.multimodalEvidenceSummary.acceptedFactCount, 0);
+  assert.equal(bundle.items[0].acceptedFacts.length, 0);
+  assert.equal(bundle.items[0].redactedText, undefined);
+  assert.equal(bundleToAnalysisEvidenceItems(bundle).length, 0);
+});
+
 test("original typed/pasted text evidence is always included", () => {
   const bundle = buildAnalysisInputBundle("c1", "u1", [textItem]);
   assert.equal(bundle.originalTextEvidence.length, 1);

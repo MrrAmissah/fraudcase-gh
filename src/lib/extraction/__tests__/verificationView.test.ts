@@ -41,11 +41,20 @@ test("CRITICAL: high_confidence_suggested renders as a suggestion, NOT trusted",
 test("only user acceptance produces a trusted badge", () => {
   assert.equal(factStatusBadge(f("accepted", true)).isTrusted, true);
   assert.equal(factStatusBadge(f("accepted", true)).tone, "trusted");
-  assert.equal(factStatusBadge(f("edited", true)).isTrusted, true);
-  // plain suggested + needs_review + rejected are all non-trusted
+  // plain suggested + high-confidence suggested + needs_review + rejected are all non-trusted,
+  // even if stale persisted flags claim verifiedByUser.
   assert.equal(factStatusBadge(f("suggested", false)).isTrusted, false);
+  assert.equal(factStatusBadge(f("suggested", true)).isTrusted, false);
+  assert.equal(factStatusBadge(f("high_confidence_suggested", true)).isTrusted, false);
   assert.equal(factStatusBadge(f("needs_review", false)).tone, "caution");
   assert.equal(factStatusBadge(f("rejected", false)).tone, "rejected");
+});
+
+test("rejected badge dominates inconsistent verifiedByUser state", () => {
+  const badge = factStatusBadge(f("rejected", true));
+  assert.equal(badge.isTrusted, false);
+  assert.equal(badge.tone, "rejected");
+  assert.equal(badge.label, "Rejected");
 });
 
 test("grounding and confidence are framed as subordinate AI signals", () => {

@@ -86,6 +86,21 @@ Never expose `GEMINI_API_KEY` to the client.
 
 ---
 
+## Multimodal staging smoke gate
+
+Before `MULTIMODAL_EXTRACTION_ENABLED` is enabled outside local/dev, run the staging smoke-test runbook in [`MULTIMODAL_STAGING_SMOKE_TEST.md`](./MULTIMODAL_STAGING_SMOKE_TEST.md). During that smoke:
+
+- Keep the flag off first and capture the expected 503 disabled response.
+- Enable the flag only in staging and only for the test window.
+- Use tiny synthetic files and run one extraction call, optionally a second for PDF. Do not loop.
+- Stop immediately on quota/billing errors, 429s, budget alerts, or repeated model failures.
+- Confirm logs contain structured event names/counts/status only. No raw OCR, raw evidence, prompts, Gemini responses, signed URLs, tokens, cookies, auth headers, API keys, or service-account data.
+- Disable the flag again after the run or on any stop trigger.
+
+Production enablement remains a separate decision after staging results and production hardening gates are reviewed.
+
+---
+
 ## Monitoring checklist
 
 - [ ] Billing budget alerts configured

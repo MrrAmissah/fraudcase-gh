@@ -234,14 +234,11 @@ export interface AnalysisInputBundle {
 
 /**
  * A fact is trusted analysis input ONLY after explicit user acceptance (Decision 2).
- * Grounding strength alone (`suggested` / `high_confidence_suggested`) is never trusted.
+ * Canonical status is authoritative: grounding strength and stale `verifiedByUser` flags are not
+ * enough to trust a fact.
  */
 export function isTrustedFact(
   f: Pick<ExtractedFact, "verifiedByUser" | "verificationStatus">,
 ): boolean {
-  return (
-    f.verifiedByUser === true ||
-    f.verificationStatus === "accepted" ||
-    f.verificationStatus === "edited"
-  );
+  return f.verificationStatus === "accepted";
 }
