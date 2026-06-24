@@ -37,14 +37,13 @@ test("isTrustedFact: unaccepted suggestions are never trusted (Decision 2)", () 
   assert.equal(isTrustedFact(fact({ verificationStatus: "rejected", verifiedByUser: false })), false);
 });
 
-test("isTrustedFact: only user acceptance makes a fact trusted", () => {
+test("isTrustedFact: accepted status makes a fact trusted", () => {
   assert.equal(isTrustedFact(fact({ verificationStatus: "accepted", verifiedByUser: true })), true);
-  assert.equal(isTrustedFact(fact({ verificationStatus: "edited", verifiedByUser: true })), true);
-  // verifiedByUser flag alone is sufficient (defensive).
-  assert.equal(isTrustedFact(fact({ verificationStatus: "suggested", verifiedByUser: true })), true);
 });
 
-test("isTrustedFact: rejected always stays excluded, even with inconsistent stored flags", () => {
+test("isTrustedFact: stale verifiedByUser cannot trust unaccepted facts", () => {
+  assert.equal(isTrustedFact(fact({ verificationStatus: "suggested", verifiedByUser: true })), false);
+  assert.equal(isTrustedFact(fact({ verificationStatus: "high_confidence_suggested", verifiedByUser: true })), false);
   assert.equal(isTrustedFact(fact({ verificationStatus: "rejected", verifiedByUser: true })), false);
 });
 
