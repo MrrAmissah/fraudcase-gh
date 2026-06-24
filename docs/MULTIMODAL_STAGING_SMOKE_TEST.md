@@ -1,9 +1,12 @@
 # Multimodal Extraction: Staging Smoke-Test Runbook
 
-**Status:** Plan only. NOT executed. Uncommitted pending approval. This is the operational gate before `MULTIMODAL_EXTRACTION_ENABLED` is ever set `true` outside local/dev.
+**Status:** Operational runbook only. NOT executed. This is the staging gate before `MULTIMODAL_EXTRACTION_ENABLED` is ever set `true` outside local/dev.
 **Date:** 2026-06-24
-**Applies to:** `main` at `6bfc366` (Sprint 3 backend + Sprint 4 workspace merged).
+**Applies to:** `main` at or after `40d49f0` (Sprint 3 backend + Sprint 4 workspace + this runbook merged).
 **Related:** [`DEPLOYMENT_RUNBOOK.md`](./DEPLOYMENT_RUNBOOK.md), [`PRODUCTION_ENV_CHECKLIST.md`](./PRODUCTION_ENV_CHECKLIST.md), [`GEMINI_QUOTA_AND_BILLING.md`](./GEMINI_QUOTA_AND_BILLING.md), [`SPRINT_3_PLAN.md`](./SPRINT_3_PLAN.md), [`STORAGE_RULES.md`](./STORAGE_RULES.md).
+
+> **DO NOT RUN THIS unless every staging precondition in §0 and §1 is satisfied.**
+> This runbook intentionally requires live staging auth, staging-only env changes, one or two real Gemini calls, and Firestore/GCS inspection. It must not be run from local/dev, against production, or before the operator has explicit approval to touch staging env and restart/redeploy staging.
 
 **Hard rules for whoever runs this:** staging only. Do not enable the flag in production. Do not touch production data. Use tiny test files. One or two extraction calls maximum. Stop on any quota/billing error and do not retry.
 
@@ -81,6 +84,45 @@ export TOKEN_B="<paste user B bearer token>"   # second identity, do not echo
 12. **[UI] Re-analyze** the case (the stale-analysis nudge "Re-analyze to include your accepted facts" should appear after step 11; use it). Confirm the analyze call succeeds (HTTP 200, analysis renders).
 13. **[observe] Confirm accepted-facts inclusion** via the observable signals in §7 (the analyze succeeds and the expected accepted count was fed in). Do NOT try to read "excluded" out of the model's prose (see §7 honesty note).
 14. **[env] If pausing or finished, disable the flag again** (`MULTIMODAL_EXTRACTION_ENABLED=false`) and restart. See §6.
+
+### 2.1 Exact API route and response checklist
+
+The current private extraction surface is:
+
+| Purpose | Method + route | Expected status / body |
+|---|---|---|
+| Health | `GET /api/health` | `200` with `{ "status": "ok", "timestamp": "...", "uptimeSeconds": n }` |
+| Fetch case after UI actions | `GET /api/cases/:id` | `200` for owner; `403` wrong owner; `404` missing case |
+| Download/preview evidence | `GET /api/cases/:id/evidence/:evidenceId/file` | `200` for owner; `403` wrong owner; `404` missing evidence/file |
+| Extract one stored evidence item | `POST /api/cases/:id/evidence/:evidenceId/extract` with `{"consentGiven":true}` | `201` with `{ "evidenceId": "...", "extractionRunId": "...", "artifact": { ... } }` on success |
+| Verify one extracted fact | `PATCH /api/cases/:id/evidence/:evidenceId/facts/:factId` with `{"decision":"accept"}` or `{"decision":"reject"}` | `200` with `{ "evidenceId": "...", "factId": "...", "verificationStatus": "accepted|rejected", "verifiedByUser": true|false }` |
+| Re-analyze accepted facts | `POST /api/cases/:id/analyze` | `200` with the refreshed case analysis |
+
+Expected extraction negative responses:
+
+| Scenario | Status | Body |
+|---|---:|---|
+| Missing/invalid auth token | `401` | auth middleware error |
+| `MULTIMODAL_EXTRACTION_ENABLED` is not exactly `true` | `503` | `{ "error": "Multimodal extraction is not enabled." }` |
+| Wrong owner | `403` | `{ "error": "Forbidden: Access denied to this case resource." }` |
+| Missing evidence item | `404` | `{ "error": "Evidence item not found." }` |
+| Missing consent or `consentGiven` not exactly `true` | `400` | `{ "error": "Consent is required to run AI extraction on this evidence." }` |
+| Evidence has no readable stored file path/object | `409` | `{ "error": "This evidence has no stored file to extract." }` |
+| Stored bytes cannot be read from GCS/local-dev storage | `502` | `{ "error": "Could not read the stored evidence file." }` |
+| Stored bytes are not PNG, JPEG, or PDF after magic-byte validation | `415` | `{ "error": "Only PNG, JPEG, or PDF evidence can be extracted." }` |
+| No Gemini model/client available after flag is on | `503` | `{ "error": "Multimodal extraction is currently unavailable." }` |
+| Extraction model timeout | `503` | `{ "error": "Extraction timed out. Please try again." }` |
+| Extraction model failure | `502` | `{ "error": "Extraction could not be completed. Please try again." }` |
+| Unhandled server failure | `500` | `{ "error": "Could not extract this evidence." }` |
+
+Expected structured log event names for the extraction window are content-free:
+
+- `evidence_extracted` with `status` and `factCount` only.
+- `multimodal_extract_ok` with `provider`, `factCount`, and `signalCount` only.
+- `multimodal_extract_skipped` with a reason such as `no_api_key`.
+- `multimodal_extract_timeout`.
+- `multimodal_extract_error` with `errorType` only.
+- `extract_storage_read_failed` with `errorType` only.
 
 ---
 
@@ -161,16 +203,20 @@ If a flag enablement caused any incident, disabling the flag + restart is the fi
 
 ---
 
-## 7. Evidence to capture + success / failure criteria
+## 7. Success evidence to capture + success / failure criteria
 
 Capture for the report:
+- Screenshot of successful staging sign-in for test user A, with no tokens or secrets visible.
+- Screenshot of the private case view showing the uploaded synthetic image/PDF evidence.
 - `/api/health` status code.
 - The §2.7 disabled-flag response (503 + body).
-- The §3 wrong-owner (403) and missing-consent (400) responses.
-- The 201 extract response shape `{ evidenceId, extractionRunId, artifact }` (artifact redacted; screenshot the workspace).
-- The Firestore evidence item + run doc dumps (§4) with the privacy fields highlighted.
-- The relevant structured log lines for the window (showing counts only, no content).
+- Request/response status summaries for the §3 wrong-owner (403) and missing-consent (400) checks. Do not capture bearer tokens, cookies, auth headers, API keys, or signed URLs.
+- The 201 extract response shape `{ evidenceId, extractionRunId, artifact }` with the artifact redacted/masked; screenshot the verification workspace.
+- Firestore evidence item + run doc screenshots/dumps (§4) with sensitive values masked and `rawVisibleText` / raw `rawValue` absence highlighted.
+- GCS object-path confirmation under `users/{uid}/cases/{caseId}/evidence/{evidenceId}/...` with no signed URLs captured.
+- The relevant structured log excerpts for the window (showing event names/counts only, no content).
 - The re-analyze HTTP 200 and the rendered analysis.
+- GitHub CI/Security status for the commit deployed to staging.
 
 **Pass** when ALL hold: health 200; disabled-flag 503 before enable; happy-path extraction returns a redacted artifact with masked sensitive values; facts are suggestions until accepted; Accept/Reject persist; re-analyze succeeds; wrong-owner 403; missing-consent 400; Firestore shows redacted-only artifact + content-free run doc in the named DB; no raw OCR/phone/prompt/response/signed-URL/bytes in storage docs or logs.
 
