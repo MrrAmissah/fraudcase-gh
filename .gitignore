@@ -15,3 +15,6 @@ secure_uploads/
 *.serviceAccount.json
 service-account*.json
 firebase-adminsdk*.json
+
+# Local-only AI/operator handoff + scratch notes (never committed)
+.ai-local/
