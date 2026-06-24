@@ -27,6 +27,8 @@ import {
   deleteCase,
   updateCase,
   seedDemoCases,
+  extractEvidence,
+  verifyFact,
 } from "./lib/firebase/firestore";
 
 // sessionStorage key holding ONLY a redacted QuickCheckResult while an anonymous user signs in.
@@ -249,6 +251,25 @@ function AppContent() {
     }
   };
 
+  // Run consent-gated AI extraction on one image/PDF evidence item. Intentionally does NOT swallow
+  // errors: EvidenceCard handles the calm 503 "disabled" state and inline messages locally.
+  const handleExtractEvidence = async (evidenceId: string) => {
+    if (!activeCaseId) return;
+    const updated = await extractEvidence(activeCaseId, evidenceId);
+    setCases((prev) => prev.map((c) => (c.id === activeCaseId ? updated : c)));
+  };
+
+  // Accept/Reject one extracted fact. Errors propagate to the workspace for inline handling.
+  const handleVerifyFact = async (
+    evidenceId: string,
+    factId: string,
+    decision: "accept" | "reject",
+  ) => {
+    if (!activeCaseId) return;
+    const updated = await verifyFact(activeCaseId, evidenceId, factId, decision);
+    setCases((prev) => prev.map((c) => (c.id === activeCaseId ? updated : c)));
+  };
+
   // Trigger server-side Gemini Model analysis
   const handleAnalyzeCase = async () => {
     if (!activeCaseId) return;
@@ -411,6 +432,8 @@ function AppContent() {
             }}
             onAddEvidence={handleAddEvidence}
             onRemoveEvidence={handleRemoveEvidence}
+            onExtractEvidence={handleExtractEvidence}
+            onVerifyFact={handleVerifyFact}
             onAnalyze={handleAnalyzeCase}
             onDeleteCase={handleDeleteCase}
             onViewReport={() => {

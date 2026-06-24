@@ -1,29 +1,38 @@
 import React, { useState } from "react";
-import { 
-  Trash2, 
-  Link, 
-  MessageSquare, 
-  AlertCircle, 
-  FileText, 
-  Image as ImageIcon, 
-  Receipt, 
-  Eye, 
-  Download, 
-  ShieldAlert, 
-  ShieldCheck, 
-  Loader2 
+import {
+  Trash2,
+  Link,
+  MessageSquare,
+  AlertCircle,
+  FileText,
+  Image as ImageIcon,
+  Receipt,
+  Eye,
+  Download,
+  ShieldAlert,
+  ShieldCheck,
+  Loader2,
+  Sparkles,
+  ScanText,
+  CheckCircle2,
+  AlertTriangle
 } from "lucide-react";
 import { EvidenceItem, EvidenceType } from "../types/evidence";
 import { formatDateTime } from "../lib/utils/dates";
 import { auth } from "../lib/firebase/client";
+import { extractionUiState, factCounts } from "../lib/extraction/verificationView";
 
 interface EvidenceCardProps {
   key?: string;
   evidence: EvidenceItem;
   onRemove?: (id: string) => void;
+  /** Run consent-gated AI extraction on this item. Throws on failure (incl. 503 when disabled). */
+  onExtract?: (id: string) => Promise<void>;
+  /** Open the verification workspace for this item. */
+  onOpenVerify?: (id: string) => void;
 }
 
-export default function EvidenceCard({ evidence, onRemove }: EvidenceCardProps) {
+export default function EvidenceCard({ evidence, onRemove, onExtract, onOpenVerify }: EvidenceCardProps) {
   const { 
     id, 
     caseId, 
@@ -40,6 +49,32 @@ export default function EvidenceCard({ evidence, onRemove }: EvidenceCardProps) 
 
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [errorText, setErrorText] = useState<string | null>(null);
+
+  // --- AI extraction (Sprint 4) ---
+  const [consentOpen, setConsentOpen] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractUnavailable, setExtractUnavailable] = useState(false);
+
+  const extractState = extractionUiState(evidence);
+  const counts = factCounts(evidence.extractedArtifact);
+
+  const handleExtract = async () => {
+    if (!onExtract || extracting) return;
+    setExtracting(true);
+    setExtractError(null);
+    try {
+      await onExtract(id);
+      setConsentOpen(false);
+    } catch (err: any) {
+      const msg = String(err?.message || "");
+      // Reactive feature-flag awareness: a 503 means extraction is disabled server-side.
+      if (/not enabled|unavailable/i.test(msg)) setExtractUnavailable(true);
+      else setExtractError(msg || "Extraction could not be completed.");
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const getEvidenceIcon = (t: EvidenceType) => {
     switch (t) {
@@ -226,6 +261,112 @@ export default function EvidenceCard({ evidence, onRemove }: EvidenceCardProps) 
       {errorText && (
         <div className="text-[10.5px] text-red-600 bg-red-50/50 border border-red-100 px-2 py-1 rounded font-sans leading-normal">
           {errorText}
+        </div>
+      )}
+
+      {/* 2b. AI Extraction panel (only for stored PNG/JPEG/PDF evidence) */}
+      {extractState !== "not_applicable" && (
+        <div className="border border-indigo-100 bg-indigo-50/40 rounded-lg p-3 space-y-2" id={`extraction-panel-${id}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5">
+              <Sparkles size={13} className="text-indigo-500" />
+              <span className="text-[11.5px] font-semibold text-indigo-900 font-sans">AI text extraction</span>
+            </div>
+            {extractState === "extracted" && (
+              <span className="text-[10px] font-sans text-indigo-700">
+                {counts.accepted}/{counts.total} accepted{counts.pending > 0 ? ` · ${counts.pending} to review` : ""}
+              </span>
+            )}
+          </div>
+
+          {extractUnavailable ? (
+            <p className="text-[11px] text-slate-500 font-sans">AI extraction is currently unavailable for this workspace.</p>
+          ) : (
+            <>
+              {extractState === "none" && !consentOpen && (
+                <button
+                  type="button"
+                  onClick={() => setConsentOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[11px] font-semibold font-sans cursor-pointer transition-colors"
+                >
+                  <ScanText size={11} /> Extract text (AI)
+                </button>
+              )}
+
+              {extractState === "in_progress" && (
+                <p className="text-[11px] text-slate-500 font-sans inline-flex items-center gap-1.5">
+                  <Loader2 size={11} className="animate-spin" /> Extracting visible text...
+                </p>
+              )}
+
+              {extractState === "extracted" && (
+                <button
+                  type="button"
+                  onClick={() => onOpenVerify?.(id)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-semibold font-sans cursor-pointer transition-colors"
+                >
+                  <CheckCircle2 size={11} /> Review &amp; verify extraction
+                </button>
+              )}
+
+              {extractState === "extracted_no_facts" && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-slate-500 font-sans">No verifiable text was found in this evidence.</p>
+                  {onOpenVerify && (
+                    <button type="button" onClick={() => onOpenVerify(id)} className="text-[11px] text-indigo-700 hover:underline font-sans cursor-pointer">
+                      View extraction details
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {(extractState === "failed" || extractState === "timeout") && !consentOpen && (
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-amber-700 font-sans inline-flex items-center gap-1.5">
+                    <AlertTriangle size={11} /> Extraction {extractState === "timeout" ? "timed out" : "did not complete"}.
+                  </p>
+                  <button type="button" onClick={() => setConsentOpen(true)} className="text-[11px] text-indigo-700 hover:underline font-sans cursor-pointer">
+                    Try again
+                  </button>
+                </div>
+              )}
+
+              {/* Shared consent confirm (extract or retry) */}
+              {consentOpen && (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-slate-600 font-sans leading-snug">
+                    This evidence will be processed by Google Gemini to extract visible text. Extracted facts stay
+                    suggestions until you accept them, and only redacted text is stored.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleExtract}
+                      disabled={extracting}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg text-[11px] font-semibold font-sans cursor-pointer transition-colors"
+                    >
+                      {extracting ? <Loader2 size={11} className="animate-spin" /> : <ScanText size={11} />}
+                      {extracting ? "Extracting..." : "Process with Gemini"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConsentOpen(false)}
+                      disabled={extracting}
+                      className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 rounded-lg text-[11px] font-medium font-sans cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {extractError && <p className="text-[10.5px] text-red-600 font-sans">{extractError}</p>}
+
+          <p className="text-[10px] text-slate-400 font-sans leading-snug">
+            AI extraction can be wrong. Review every fact before it informs your case.
+          </p>
         </div>
       )}
 

@@ -40,6 +40,8 @@ interface CaseDetailPageProps {
     file?: File
   ) => void;
   onRemoveEvidence: (id: string) => void;
+  onExtractEvidence: (evidenceId: string) => Promise<void>;
+  onVerifyFact: (evidenceId: string, factId: string, decision: "accept" | "reject") => Promise<void>;
   onAnalyze: () => void;
   onDeleteCase: () => void;
   onViewReport: () => void;
@@ -51,6 +53,8 @@ export default function CaseDetailPage({
   onBack,
   onAddEvidence,
   onRemoveEvidence,
+  onExtractEvidence,
+  onVerifyFact,
   onAnalyze,
   onDeleteCase,
   onViewReport,
@@ -59,6 +63,7 @@ export default function CaseDetailPage({
   const { id, title, description, status, incidentDate, createdAt, updatedAt, evidenceItems, analysis } = fraudCase;
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [verifyingEvidenceId, setVerifyingEvidenceId] = useState<string | null>(null);
   const evidenceFormRef = useRef<HTMLDivElement>(null);
 
   const hasAnalysis = !!analysis;
@@ -320,6 +325,8 @@ export default function CaseDetailPage({
                     key={item.id}
                     evidence={item}
                     onRemove={onRemoveEvidence}
+                    onExtract={onExtractEvidence}
+                    onOpenVerify={(eid) => setVerifyingEvidenceId(eid)}
                   />
                 ))}
               </div>
