@@ -141,6 +141,49 @@ export async function deleteEvidence(caseId: string, evidenceId: string): Promis
 }
 
 /**
+ * Run consent-gated AI multimodal extraction on one image/PDF evidence item, then return the
+ * refreshed case (the redacted artifact is embedded on the evidence item server-side).
+ * Throws with the server's calm message on 503 (extraction disabled), 400 (consent), 403, 415, etc.
+ */
+export async function extractEvidence(caseId: string, evidenceId: string): Promise<FraudCase> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`/api/cases/${caseId}/evidence/${evidenceId}/extract`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ consentGiven: true }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Extraction failed." }));
+    throw new Error(err.error || response.statusText);
+  }
+  // The endpoint returns { evidenceId, artifact }; re-fetch the case so local state reflects it.
+  return getCaseById(caseId);
+}
+
+/**
+ * Accept or Reject a single extracted fact, then return the refreshed case. Only accepted facts
+ * become trusted analysis input; rejection excludes a fact.
+ */
+export async function verifyFact(
+  caseId: string,
+  evidenceId: string,
+  factId: string,
+  decision: "accept" | "reject",
+): Promise<FraudCase> {
+  const headers = await getAuthHeaders();
+  const response = await fetch(`/api/cases/${caseId}/evidence/${evidenceId}/facts/${factId}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ decision }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: "Could not update the fact." }));
+    throw new Error(err.error || response.statusText);
+  }
+  return getCaseById(caseId);
+}
+
+/**
  * Trigger AI analysis for the evidence in a case.
  */
 export async function analyzeCase(caseId: string): Promise<FraudCase> {
