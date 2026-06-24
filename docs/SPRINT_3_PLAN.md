@@ -1,6 +1,6 @@
 # Sprint 3 Plan: Private Multimodal Evidence Pipeline
 
-**Status:** Plan only. Planning decisions resolved 2026-06-23. Implementation NOT started and NOT yet approved. No implementation code, no push.
+**Status:** Archived implementation plan. Planning decisions resolved 2026-06-23; Sprint 3 backend implementation has since merged to `main`.
 **Date:** 2026-06-23
 **Parent:** [`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md) (Sprint 3 row)
 **Related:** [`PRODUCTION_DEFINITION_OF_DONE.md`](./PRODUCTION_DEFINITION_OF_DONE.md) §4, [`AGENT_PLAYBOOK.md`](./AGENT_PLAYBOOK.md), [`research/2026-06-21-fraudcase-multimodal-evidence-research.md`](./research/2026-06-21-fraudcase-multimodal-evidence-research.md), [`research/2026-06-21-ai-studio-multimodal-feedback.md`](./research/2026-06-21-ai-studio-multimodal-feedback.md), [`GEMINI_QUOTA_AND_BILLING.md`](./GEMINI_QUOTA_AND_BILLING.md)
@@ -9,7 +9,9 @@ This document plans Sprint 3. It does not implement anything by itself.
 
 **Implementation status (2026-06-23):** the Sprint 3 backend pipeline is implemented behind `MULTIMODAL_EXTRACTION_ENABLED` (default off) and merged to `main`: extraction types/schema/prompts, deterministic grounding, redacted-artifact builder, the Gemini extractor, the consent-gated extract endpoint with bounded persistence and an `extractionRuns` subcollection, the thin Accept/Reject verification path, accepted-facts-only analysis integration, and the privacy/injection/owner-isolation/fallback test suite.
 
-**Sprint 4 status (2026-06-24):** the private verification workspace is implemented on branch `sprint-4-verification-workspace`: a split-screen modal (owner-authenticated evidence preview + extracted-facts panel), an `EvidenceCard` extraction entry with a minimal Gemini consent confirm and reactive 503 disabled/empty states, dominant status badges (grounding strength and confidence shown only as subordinate "AI signals", never as trust), per-fact **Accept/Reject**, the "extraction can be wrong" warning, and a stale-analysis nudge prompting re-analysis after the accepted set changes. The feature remains flag-gated (`MULTIMODAL_EXTRACTION_ENABLED` default off). **Edit-a-fact is deferred:** it requires a new `edit` branch in the already-QA'd `applyFactVerification` plus `editedValue` redaction at the route and tests, which re-opens the backend contract; that is a follow-up, not part of this UI sprint. Frontend has no component-test harness, so Sprint 4 logic is covered by pure view-model tests (`verificationView`).
+**Sprint 4 status (2026-06-24):** the private verification workspace is implemented and merged to `main`: a split-screen modal (owner-authenticated evidence preview + extracted-facts panel), an `EvidenceCard` extraction entry with a minimal Gemini consent confirm and reactive 503 disabled/empty states, dominant status badges (grounding strength and confidence shown only as subordinate "AI signals", never as trust), per-fact **Accept/Reject**, the "extraction can be wrong" warning, and a stale-analysis nudge prompting re-analysis after the accepted set changes. The feature remains flag-gated (`MULTIMODAL_EXTRACTION_ENABLED` default off). **Edit-a-fact is deferred:** it requires a new `edit` branch in the already-QA'd `applyFactVerification` plus `editedValue` redaction at the route and tests, which re-opens the backend contract; that is a follow-up, not part of this UI sprint. Frontend has no component-test harness, so Sprint 4 logic is covered by pure view-model tests (`verificationView`).
+
+**Operational gate:** no one has run the real staging smoke test yet. `MULTIMODAL_EXTRACTION_ENABLED` must stay off outside local/dev until [`MULTIMODAL_STAGING_SMOKE_TEST.md`](./MULTIMODAL_STAGING_SMOKE_TEST.md) passes against staging with live auth, Gemini, Firestore, GCS, privacy/logging checks, and rollback.
 
 Repo baseline at planning time: `main` at `ceb69ad`; Sprint 2 backend hardening merged; CI and Security green; Firebase web key rotation fully closed; follow-up issues #7 to #12 open.
 
@@ -31,7 +33,7 @@ Repo baseline at planning time: `main` at `ceb69ad`; Sprint 2 backend hardening 
 - **Sensitive values such as phone numbers are persisted masked/redacted only.** Raw `rawValue` and full normalized values for sensitive types are never persisted.
 - **Raw OCR / extraction text is request-memory only**, unless an explicit bounded and redacted persistence rule is approved (see Trusted analysis input in §5.7; only redacted, bounded text persists, never raw OCR).
 - **Gemini extraction reads bytes server-side from owner-isolated storage paths** (`storagePath`), never from client-provided URLs or client-sent bytes.
-- **Tests under `src/lib/extraction/__tests__/` must be added to the test runner glob before they are relied on**; the current `package.json` glob does not include that path (see §8 commit 2).
+- **Tests under `src/lib/extraction/__tests__/` are included in the test runner glob** and must remain there before extraction changes are relied on.
 - **Deterministic tests can verify prompt guards and data flow, but live model obedience still needs manual QA / AI Studio review.** Automated tests do not "prove" injection resistance.
 
 ---
@@ -481,6 +483,6 @@ Auth + owner isolation on every route; per-run consent recorded; raw OCR transie
 2. **Verification default:** no automatic trust. `auto_validated` is removed. A fact is trusted analysis input only when `verifiedByUser === true` or `verificationStatus === "accepted"`. Strong grounding yields `suggested` or `high_confidence_suggested` labels only.
 3. **Env flag name:** `MULTIMODAL_EXTRACTION_ENABLED` (default off). The generic `EXTRACTION_ENABLED` is rejected.
 
-Implementation has not started and is not yet approved. No implementation code will be written until the user approves the start of Sprint 3 implementation.
+Implementation has merged, but production/staging enablement has not happened. Do not treat this plan as authorization to enable the flag, deploy, run the staging smoke test, or start public multimodal work.
 
 _Last updated: 2026-06-23_

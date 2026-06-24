@@ -3,7 +3,7 @@
 **Status:** Sprint 1  
 **Parent:** [`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md), [`ENV_SETUP.md`](./ENV_SETUP.md)
 
-Use before staging deploy and public launch. Never commit real values.
+Use before staging deploy and public launch. Never commit real values. For staging, the Firebase Auth authorized domain and the web API-key HTTP referrer allowlist must match the staging hostname exactly before any browser sign-in or smoke test.
 
 ---
 
@@ -21,6 +21,8 @@ Use before staging deploy and public launch. Never commit real values.
 | `VITE_APP_CHECK_ENABLED` | Sprint 2 | `true` |
 | `VITE_RECAPTCHA_ENTERPRISE_SITE_KEY` | Sprint 2 | App Check provider |
 | `VITE_CAPTCHA_SITE_KEY` | Sprint 2 | Turnstile/reCAPTCHA |
+
+Staging and production builds must be built with the matching environment's `VITE_FIREBASE_*` values because these are bundled into the client. Do not promote a dev-built client bundle into staging or production.
 
 ---
 
@@ -41,17 +43,20 @@ Use before staging deploy and public launch. Never commit real values.
 | `CAPTCHA_SECRET_KEY` | Sprint 2 | Secret Manager |
 | `CAPTCHA_ENFORCE` | Sprint 2 | `true` to enforce CAPTCHA |
 
+`MULTIMODAL_EXTRACTION_ENABLED` must remain unset or `false` in production until the staging smoke test is clean and App Check/CAPTCHA, deployed Firestore/Storage rules, owner-isolation checks, billing/quota controls, and rollback readiness have been reviewed for that environment.
+
 ---
 
 ## Firebase console
 
 - [ ] Email/password auth enabled
-- [ ] Firestore database created (custom ID if used)
+- [ ] Firestore database created (custom ID if used). If using the named database path, confirm the ID matches `ai-studio-36d6feb3-b3c2-4e2a-9c6b-46c7b67a02e9`; querying `(default)` can produce false-clean verification.
 - [ ] Storage bucket created, **not public**
 - [ ] `firestore.rules` deployed from repo
 - [ ] `storage.rules` deployed from [`STORAGE_RULES.md`](./STORAGE_RULES.md)
 - [ ] App Check registered (Sprint 2)
-- [ ] Authorized domains include production hostname
+- [ ] Authorized domains include the staging hostname for staging and the production hostname for production
+- [ ] Firebase web API-key HTTP referrer restrictions include only the intended staging/production hostnames
 
 ---
 
@@ -79,6 +84,7 @@ Use before staging deploy and public launch. Never commit real values.
 
 ```bash
 npm run check:env
+npm run check:multimodal-readiness
 npm test
 npm run lint
 npm run build
