@@ -40,6 +40,15 @@ function check(label, ok) {
   else fail(label);
 }
 
+function exportedInterfaceBlock(source, name) {
+  const match = source.match(new RegExp(`export interface ${name} \\{([\\s\\S]*?)\\n\\}`));
+  return match ? match[1] : "";
+}
+
+function hasNone(source, patterns) {
+  return patterns.every((pattern) => !pattern.test(source));
+}
+
 console.log("\nFraudCase GH — multimodal staging-readiness static check");
 console.log("Values are never printed. No network, cloud, Gemini, deploy, or env mutation is performed.\n");
 
@@ -109,6 +118,29 @@ check("pipeline never writes OCR into text evidence fields", pipeline.includes("
 
 const sourceMapping = read("src/lib/extraction/sourceMapping.ts");
 check("analysis bundle uses only accepted extracted facts", sourceMapping.includes("Only user-accepted extracted facts are used as analysis input."));
+
+const types = read("src/lib/extraction/types.ts");
+const extractionRunType = exportedInterfaceBlock(types, "ExtractionRun");
+const extractedFactType = exportedInterfaceBlock(types, "ExtractedFact");
+const rawExtractionType = exportedInterfaceBlock(types, "RawExtraction");
+const rawFactType = exportedInterfaceBlock(types, "RawExtractedFact");
+check("ExtractionRun type omits raw text/prompt/response fields", !!extractionRunType && hasNone(extractionRunType, [/\brawVisibleText\b/, /\bredactedText\b/, /\bprompt\b/i, /\bresponse\b/i, /\bsignedUrl\b/i, /\btoken\b/i]));
+check("persisted ExtractedFact type omits rawValue", !!extractedFactType && !/\brawValue\b/.test(extractedFactType));
+check("raw extraction types are explicitly memory-only", rawExtractionType.includes("rawVisibleText") && rawFactType.includes("rawValue") && types.includes("Request-memory ONLY"));
+
+const extractionAndUiFiles = [
+  "src/lib/extraction/extractionPipeline.ts",
+  "src/lib/extraction/multimodalExtractor.ts",
+  "src/lib/extraction/redactExtractedText.ts",
+  "src/lib/extraction/sourceMapping.ts",
+  "src/components/EvidenceCard.tsx",
+  "src/components/VerificationWorkspace.tsx",
+];
+for (const file of extractionAndUiFiles) {
+  const source = read(file);
+  check(`${file} has no console.log`, !/\bconsole\.log\s*\(/.test(source));
+  check(`${file} has no signed URL helper usage`, !/\bgetSignedUrl\b|\bsignedUrl\b/.test(source));
+}
 
 const runbook = read("docs/MULTIMODAL_STAGING_SMOKE_TEST.md");
 check("runbook has do-not-run staging guard", runbook.includes("DO NOT RUN THIS"));
