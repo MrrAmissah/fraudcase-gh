@@ -1,7 +1,13 @@
 # FraudCase Quick Check — Phased Implementation Plan (TODO)
 
-_Status: **not started** (see `QUICK_CHECK_IMPLEMENTATION_AUDIT.md`). This is a proposal — get
-approval before building. Each phase is independently shippable and leaves the app green._
+_**Status update (2026-06-24):** Phases 1–4 have been implemented and merged (public analyze,
+save-as-private-case bridge, consented community signals, admin review dashboard). Remaining
+production-hardening items from Phase 5 (App Check / CAPTCHA enforcement, clustering polish) are
+tracked separately in issues #9 and #10. This file is retained as historical implementation
+context, not as an active "not started" TODO list._
+
+_Original framing (kept for context): a proposal where each phase is independently shippable and
+leaves the app green. See `QUICK_CHECK_IMPLEMENTATION_AUDIT.md`._
 
 ## Guardrails (apply to every phase)
 - Do **not** touch: private dashboard/case-detail/evidence-vault/report-preview layouts, Firebase
