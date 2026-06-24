@@ -48,6 +48,13 @@ test("only user acceptance produces a trusted badge", () => {
   assert.equal(factStatusBadge(f("rejected", false)).tone, "rejected");
 });
 
+test("rejected badge dominates inconsistent verifiedByUser state", () => {
+  const badge = factStatusBadge(f("rejected", true));
+  assert.equal(badge.isTrusted, false);
+  assert.equal(badge.tone, "rejected");
+  assert.equal(badge.label, "Rejected");
+});
+
 test("grounding and confidence are framed as subordinate AI signals", () => {
   assert.match(factGroundingLabel("exact_match"), /^AI grounding:/);
   assert.match(factConfidenceLabel(0.9), /^AI confidence: high/);

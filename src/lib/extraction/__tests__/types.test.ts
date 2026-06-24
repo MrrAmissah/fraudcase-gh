@@ -44,6 +44,10 @@ test("isTrustedFact: only user acceptance makes a fact trusted", () => {
   assert.equal(isTrustedFact(fact({ verificationStatus: "suggested", verifiedByUser: true })), true);
 });
 
+test("isTrustedFact: rejected always stays excluded, even with inconsistent stored flags", () => {
+  assert.equal(isTrustedFact(fact({ verificationStatus: "rejected", verifiedByUser: true })), false);
+});
+
 test("sensitive fact types include phone and exclude amount", () => {
   assert.ok(SENSITIVE_FACT_TYPES.has("phone_number"));
   assert.ok(SENSITIVE_FACT_TYPES.has("person_name"));

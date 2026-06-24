@@ -239,6 +239,7 @@ export interface AnalysisInputBundle {
 export function isTrustedFact(
   f: Pick<ExtractedFact, "verifiedByUser" | "verificationStatus">,
 ): boolean {
+  if (f.verificationStatus === "rejected") return false;
   return (
     f.verifiedByUser === true ||
     f.verificationStatus === "accepted" ||
