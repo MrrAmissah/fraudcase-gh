@@ -2,10 +2,10 @@
 
 **Date:** 2026-06-24  
 **Mode:** Local atomic commit mode  
-**Branch:** `main`  
+**Branch:** `local/multimodal-readiness-hardening`  
 **Starting commit:** `c702799292d5061477a06938cdfb84252515a694` (`docs: add multimodal readiness checks`)  
-**Current commit before this handoff commit:** `cf4e56b592cf53e772725771be3b5af60db391e5` (`test: cover multimodal verification edge cases`)  
-**Final local commit:** `docs: update Codex handoff checkpoint` (this file)
+**Current commit before this handoff update:** `a3bdeeb` (`fix: require accepted status for trusted extracted facts`)  
+**Final local commit:** `docs: update local handoff after trusted-fact hardening` (this file)
 
 ## Local Commits Created
 
@@ -13,7 +13,9 @@
 2. `7db75b8 test: add synthetic multimodal staging fixtures`
 3. `85c2361 docs: clarify multimodal staging gate`
 4. `cf4e56b test: cover multimodal verification edge cases`
-5. `docs: update Codex handoff checkpoint` (final checkpoint commit)
+5. `46854df docs: update Codex handoff checkpoint`
+6. `a3bdeeb fix: require accepted status for trusted extracted facts`
+7. `docs: update local handoff after trusted-fact hardening` (final checkpoint commit)
 
 ## Files Changed
 
@@ -24,12 +26,15 @@
 - `docs/SPRINT_3_PLAN.md`
 - `src/lib/extraction/types.ts`
 - `src/lib/extraction/__tests__/types.test.ts`
+- `src/lib/extraction/__tests__/sourceMapping.test.ts`
 - `src/lib/extraction/__tests__/verificationView.test.ts`
 - `docs/CODEX_HANDOFF.md`
 
 ## Commands Run
 
 - `git checkout main`
+- `git branch local/multimodal-readiness-hardening HEAD`
+- `git switch local/multimodal-readiness-hardening`
 - `git status --short`
 - `git log --oneline --max-count=12`
 - `git branch --show-current`
@@ -42,7 +47,7 @@
 ## Validation Status
 
 - `npm run check:multimodal-readiness`: passed
-- `npm test`: passed, `108/108`
+- `npm test`: passed, `109/109`
 - `npm run lint`: passed
 - `npm run build`: passed
 
@@ -57,8 +62,9 @@ Build note: Vite still reports the pre-existing non-failing warnings about CSS `
   - checks extraction/UI surfaces for `console.log` and signed URL helper usage
 - Added local-only synthetic staging fixture guidance in `docs/staging-fixtures/README.md`.
 - Clarified the multimodal staging gate across production env, quota/billing, and Sprint 3 docs.
-- Hardened `isTrustedFact` so `rejected` always remains excluded, even if stored flags are inconsistent.
-- Added pure tests covering rejected dominance in trust and badge semantics.
+- Hardened `isTrustedFact` so only canonical `verificationStatus === "accepted"` is trusted analysis input.
+- Added pure tests covering stale/inconsistent `verifiedByUser` flags on suggested, high-confidence suggested, and rejected facts.
+- Added analysis-bundle coverage proving stale `verifiedByUser` on a suggested fact does not reach final analysis input.
 
 ## Remaining
 
