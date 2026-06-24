@@ -32,14 +32,16 @@ import {
   buildCaseUpdatePayload,
   resolveOwnerIdFromToken,
 } from "./src/lib/security/ownerIsolation";
+import { resolvePort } from "./src/lib/config/runtimeConfig";
 import multer from "multer";
 import fs from "fs";
 
 // Initialize environment variables
 dotenv.config();
 
-// Port & Host binding required by the AI Studio reverse-proxy environment
-const PORT = 3000;
+// Host binding required by the AI Studio reverse-proxy environment. Port honors process.env.PORT
+// (injected by Cloud Run and most container platforms) and falls back to 3000 for local dev.
+const PORT = resolvePort();
 const HOST = "0.0.0.0";
 
 // --- Public Quick Check (no-auth) abuse control + helpers ---

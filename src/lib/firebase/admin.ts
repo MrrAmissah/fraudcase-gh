@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
+import { resolveFirestoreDatabaseId } from "../config/runtimeConfig";
 
 const app = getApps().length === 0 
   ? initializeApp({
@@ -10,8 +11,9 @@ const app = getApps().length === 0
     }) 
   : getApp();
 
-// Bind specifically to our provisioned custom Firestore database ID
-export const adminDb = getFirestore(app, "ai-studio-36d6feb3-b3c2-4e2a-9c6b-46c7b67a02e9");
+// Bind to the provisioned custom Firestore database. Defaults to the AI Studio database id; a
+// separate staging project can override it via FIRESTORE_DATABASE_ID (never silently `(default)`).
+export const adminDb = getFirestore(app, resolveFirestoreDatabaseId());
 
 // Optional evidence fields (e.g. originalText/extractedText/storageProvider) may be
 // undefined; ignore them on write instead of throwing.
