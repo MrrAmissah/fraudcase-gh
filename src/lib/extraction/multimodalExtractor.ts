@@ -9,7 +9,7 @@ import { GoogleGenAI } from "@google/genai";
 import { extractionSchema } from "./extractionSchema";
 import { EXTRACTION_SYSTEM_INSTRUCTION, buildExtractionPrompt } from "./extractionPrompt";
 import { withTimeout, GeminiTimeoutError } from "../gemini/withTimeout";
-import { resolveGeminiModel } from "../config/runtimeConfig";
+import { resolveGeminiModel, resolveGenAIClientConfig } from "../config/runtimeConfig";
 import { logEvent, safeErrorType } from "../observability/logger";
 import {
   type ExtractedFactType,
@@ -38,9 +38,12 @@ export function isMultimodalExtractionEnabled(): boolean {
 
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!aiClient && apiKey) {
-    aiClient = new GoogleGenAI({ apiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } });
+  if (!aiClient) {
+    const cfg = resolveGenAIClientConfig();
+    if (!cfg) return null;
+    aiClient = cfg.vertexai
+      ? new GoogleGenAI({ vertexai: true, project: cfg.project, location: cfg.location })
+      : new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } });
   }
   return aiClient;
 }

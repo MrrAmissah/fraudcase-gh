@@ -7,6 +7,8 @@ import {
   DEFAULT_FIRESTORE_DATABASE_ID,
   resolveGeminiModel,
   DEFAULT_GEMINI_MODEL,
+  resolveGenAIClientConfig,
+  DEFAULT_VERTEX_LOCATION,
 } from "./runtimeConfig";
 
 test("resolvePort: defaults to 3000 when PORT is unset or empty", () => {
@@ -55,4 +57,35 @@ test("resolveGeminiModel: honors the GEMINI_MODEL override (applies to analyzer 
 test("resolveGeminiModel: empty/whitespace falls back to the default", () => {
   assert.equal(resolveGeminiModel({ GEMINI_MODEL: "" } as unknown as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
   assert.equal(resolveGeminiModel({ GEMINI_MODEL: "  " } as unknown as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
+});
+
+test("resolveGenAIClientConfig: defaults to Gemini API (apiKey) mode", () => {
+  const cfg = resolveGenAIClientConfig({ GEMINI_API_KEY: "AIzaXXXX" } as unknown as NodeJS.ProcessEnv);
+  assert.deepEqual(cfg, { vertexai: false, apiKey: "AIzaXXXX" });
+});
+
+test("resolveGenAIClientConfig: Vertex mode uses ADC + project/location, no apiKey", () => {
+  const cfg = resolveGenAIClientConfig({
+    GOOGLE_GENAI_USE_VERTEXAI: "true",
+    GOOGLE_CLOUD_PROJECT: "stellar-perigee-498907-c4",
+    GOOGLE_CLOUD_LOCATION: "europe-west1",
+  } as unknown as NodeJS.ProcessEnv);
+  assert.deepEqual(cfg, { vertexai: true, project: "stellar-perigee-498907-c4", location: "europe-west1" });
+  assert.equal((cfg as { apiKey?: string }).apiKey, undefined);
+});
+
+test("resolveGenAIClientConfig: Vertex falls back to VITE project + default region", () => {
+  const cfg = resolveGenAIClientConfig({
+    GOOGLE_GENAI_USE_VERTEXAI: "true",
+    VITE_FIREBASE_PROJECT_ID: "proj-x",
+  } as unknown as NodeJS.ProcessEnv);
+  assert.deepEqual(cfg, { vertexai: true, project: "proj-x", location: DEFAULT_VERTEX_LOCATION });
+});
+
+test("resolveGenAIClientConfig: null when nothing is configured (heuristic fallback)", () => {
+  assert.equal(resolveGenAIClientConfig({} as NodeJS.ProcessEnv), null);
+  assert.equal(
+    resolveGenAIClientConfig({ GOOGLE_GENAI_USE_VERTEXAI: "true" } as unknown as NodeJS.ProcessEnv),
+    null,
+  );
 });

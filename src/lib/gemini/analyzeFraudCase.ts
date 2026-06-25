@@ -5,7 +5,7 @@ import { EvidenceItem } from "../../types/evidence";
 import { FraudAnalysis } from "../../types/analysis";
 import { logEvent, safeErrorType } from "../observability/logger";
 import { withTimeout, GeminiTimeoutError } from "./withTimeout";
-import { resolveGeminiModel } from "../config/runtimeConfig";
+import { resolveGeminiModel, resolveGenAIClientConfig } from "../config/runtimeConfig";
 
 // Server-side Gemini model id is resolved from GEMINI_MODEL (or a stable default) at call time,
 // shared with the multimodal extractor (see src/lib/config/runtimeConfig.ts). Previously this was
@@ -15,16 +15,12 @@ import { resolveGeminiModel } from "../config/runtimeConfig";
 // so analysis works regardless of when dotenv.config() runs relative to this module being imported.
 let aiClient: GoogleGenAI | null = null;
 function getAiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!aiClient && apiKey) {
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
-    });
+  if (!aiClient) {
+    const cfg = resolveGenAIClientConfig();
+    if (!cfg) return null;
+    aiClient = cfg.vertexai
+      ? new GoogleGenAI({ vertexai: true, project: cfg.project, location: cfg.location })
+      : new GoogleGenAI({ apiKey: cfg.apiKey, httpOptions: { headers: { "User-Agent": "aistudio-build" } } });
   }
   return aiClient;
 }

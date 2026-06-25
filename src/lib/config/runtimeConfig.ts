@@ -50,3 +50,33 @@ export function resolveGeminiModel(env: NodeJS.ProcessEnv = process.env): string
   const raw = (env.GEMINI_MODEL || "").trim();
   return raw || DEFAULT_GEMINI_MODEL;
 }
+
+/** Default Vertex AI region used when GOOGLE_CLOUD_LOCATION is unset. */
+export const DEFAULT_VERTEX_LOCATION = "us-central1";
+
+export interface ResolvedGenAIConfig {
+  vertexai: boolean;
+  apiKey?: string;
+  project?: string;
+  location?: string;
+}
+
+/**
+ * Decide how to construct the `@google/genai` client, so the same code runs against either backend:
+ *  - **Vertex AI** when `GOOGLE_GENAI_USE_VERTEXAI=true`: uses ADC (the runtime service account), the
+ *    project (`GOOGLE_CLOUD_PROJECT` or `VITE_FIREBASE_PROJECT_ID`) and a region
+ *    (`GOOGLE_CLOUD_LOCATION` or {@link DEFAULT_VERTEX_LOCATION}). No API key; billed via Cloud Billing.
+ *  - **Gemini API (AI Studio)** otherwise: uses `GEMINI_API_KEY`.
+ * Returns `null` when nothing is configured, so callers fall back to the heuristic (calm no-op).
+ */
+export function resolveGenAIClientConfig(env: NodeJS.ProcessEnv = process.env): ResolvedGenAIConfig | null {
+  if ((env.GOOGLE_GENAI_USE_VERTEXAI || "").trim().toLowerCase() === "true") {
+    const project = (env.GOOGLE_CLOUD_PROJECT || env.VITE_FIREBASE_PROJECT_ID || "").trim();
+    if (!project) return null;
+    const location = (env.GOOGLE_CLOUD_LOCATION || "").trim() || DEFAULT_VERTEX_LOCATION;
+    return { vertexai: true, project, location };
+  }
+  const apiKey = (env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) return null;
+  return { vertexai: false, apiKey };
+}
