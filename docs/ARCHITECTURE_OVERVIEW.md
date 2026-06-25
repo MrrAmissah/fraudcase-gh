@@ -73,7 +73,7 @@ It binds to port `3000`.
 - Provides `adminAuth`, `adminDb` (Firestore), and `adminStorage`.
 
 ### Gemini API
-- Called from `src/lib/gemini/analyzeFraudCase.ts` via `@google/genai`, model `gemini-3.5-flash`, with `responseMimeType: application/json` and a `responseSchema` (`src/lib/gemini/fraudCaseSchema.ts`) so output is typed JSON matching `FraudAnalysis`.
+- Called from `src/lib/gemini/analyzeFraudCase.ts` via `@google/genai`, model `gemini-2.5-flash`, with `responseMimeType: application/json` and a `responseSchema` (`src/lib/gemini/fraudCaseSchema.ts`) so output is typed JSON matching `FraudAnalysis`.
 - The API key is read **at call time** (not module load) so environment loading order cannot bypass it.
 - On a missing key or any error, the orchestrator falls back to a deterministic heuristic (`generateHeuristicMockAnalysis`) and logs the real reason in development.
 

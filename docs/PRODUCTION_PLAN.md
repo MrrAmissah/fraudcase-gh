@@ -22,7 +22,7 @@ FraudCase GH is a full-stack Express + React application for organizing digital 
 | **Private cases** | CRUD, text evidence, file upload (GCS or local-dev fallback), analysis, PDF export |
 | **Upload security** | Extension/MIME/magic-byte validation, size caps, sanitized filenames |
 | **Admin** | Email allowlist (`ADMIN_EMAILS`), fail-closed; server-mediated signal review |
-| **AI** | Gemini (`gemini-3.5-flash`) with deterministic heuristic fallback |
+| **AI** | Gemini (`gemini-2.5-flash`) with deterministic heuristic fallback |
 | **Tests** | Analysis quality / anti-fabrication unit tests |
 
 ### Production gaps (honest)

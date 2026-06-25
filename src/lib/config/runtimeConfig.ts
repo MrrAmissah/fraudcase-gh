@@ -33,3 +33,20 @@ export function resolveFirestoreDatabaseId(env: NodeJS.ProcessEnv = process.env)
   const raw = (env.FIRESTORE_DATABASE_ID || "").trim();
   return raw || DEFAULT_FIRESTORE_DATABASE_ID;
 }
+
+/**
+ * Default Gemini model id. `gemini-2.5-flash` is a stable, generally-available multimodal model.
+ * The previously hardcoded `gemini-3.5-flash` returned `ApiError:503` (not reliably serving) during
+ * the staging smoke test, so it is no longer the default.
+ */
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+
+/**
+ * Resolve the Gemini model id, honoring the `GEMINI_MODEL` override and falling back to the stable
+ * default. Used by BOTH the case analyzer and the multimodal extractor so an env override applies
+ * everywhere (previously the analyzer hardcoded its model and ignored the env var).
+ */
+export function resolveGeminiModel(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = (env.GEMINI_MODEL || "").trim();
+  return raw || DEFAULT_GEMINI_MODEL;
+}
