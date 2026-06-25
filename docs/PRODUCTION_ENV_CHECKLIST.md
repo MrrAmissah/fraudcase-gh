@@ -31,7 +31,7 @@ Staging and production builds must be built with the matching environment's `VIT
 | Variable | Required | Source |
 |---|---|---|
 | `GEMINI_API_KEY` | Recommended | Secret Manager |
-| `GEMINI_MODEL` | Optional | Default `gemini-3.5-flash` |
+| `GEMINI_MODEL` | Optional | Default `gemini-2.5-flash` |
 | `MULTIMODAL_EXTRACTION_ENABLED` | Sprint 3 | `false` by default; set `true` only when ready to enable private image/PDF extraction |
 | `MULTIMODAL_EXTRACTION_TIMEOUT_MS` | Optional (S3) | Per-call extraction timeout; default 30000 |
 | `ADMIN_EMAILS` | For admin | Secret Manager |

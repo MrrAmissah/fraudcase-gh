@@ -60,7 +60,7 @@ The server uses the Admin SDK for Firestore + Storage. Provide credentials one o
   fails (sign-in persistence, cases, uploads, analyze-persist, signals, admin).
 
 ## Gemini (`GEMINI_API_KEY`)
-- Set it to enable real `gemini-3.5-flash` analysis (server-side only — never a client key).
+- Set it to enable real `gemini-2.5-flash` analysis (server-side only — never a client key).
 - If unset, `analyzeFraudCase` logs a warning and returns a heuristic mock — the app still works
   end-to-end.
 

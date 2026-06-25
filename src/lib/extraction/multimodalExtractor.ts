@@ -9,6 +9,7 @@ import { GoogleGenAI } from "@google/genai";
 import { extractionSchema } from "./extractionSchema";
 import { EXTRACTION_SYSTEM_INSTRUCTION, buildExtractionPrompt } from "./extractionPrompt";
 import { withTimeout, GeminiTimeoutError } from "../gemini/withTimeout";
+import { resolveGeminiModel } from "../config/runtimeConfig";
 import { logEvent, safeErrorType } from "../observability/logger";
 import {
   type ExtractedFactType,
@@ -20,9 +21,9 @@ import {
 
 const DEFAULT_EXTRACTION_TIMEOUT_MS = 30000;
 
-/** Model id used for extraction; overridable via GEMINI_MODEL. Read at call time. */
+/** Model id used for extraction; overridable via GEMINI_MODEL, with a stable default. Read at call time. */
 export function extractionModelId(): string {
-  return process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  return resolveGeminiModel();
 }
 
 function extractionTimeoutMs(): number {

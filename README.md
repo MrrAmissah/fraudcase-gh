@@ -66,7 +66,7 @@ FraudCase GH addresses all three: it **organizes** evidence into a private case,
 | Backend | Node.js, Express 4, `tsx` (dev), `esbuild` (production bundle), `multer` (uploads) |
 | Auth / Data / Files | Firebase Authentication (email/password), Cloud Firestore, Firebase Cloud Storage |
 | Server credentials | Firebase Admin SDK via **Application Default Credentials (ADC)** |
-| AI | Google Gemini via `@google/genai` (model `gemini-3.5-flash`) + deterministic heuristic fallback |
+| AI | Google Gemini via `@google/genai` (model `gemini-2.5-flash`) + deterministic heuristic fallback |
 | Tests | Node built-in test runner (`node:test`) executed through `tsx` |
 
 ---

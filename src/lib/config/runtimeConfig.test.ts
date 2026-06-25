@@ -5,6 +5,8 @@ import {
   DEFAULT_PORT,
   resolveFirestoreDatabaseId,
   DEFAULT_FIRESTORE_DATABASE_ID,
+  resolveGeminiModel,
+  DEFAULT_GEMINI_MODEL,
 } from "./runtimeConfig";
 
 test("resolvePort: defaults to 3000 when PORT is unset or empty", () => {
@@ -38,4 +40,19 @@ test("resolveFirestoreDatabaseId: empty/whitespace never silently becomes (defau
   assert.equal(resolveFirestoreDatabaseId({ FIRESTORE_DATABASE_ID: "" } as unknown as NodeJS.ProcessEnv), DEFAULT_FIRESTORE_DATABASE_ID);
   assert.equal(resolveFirestoreDatabaseId({ FIRESTORE_DATABASE_ID: "   " } as unknown as NodeJS.ProcessEnv), DEFAULT_FIRESTORE_DATABASE_ID);
   assert.notEqual(resolveFirestoreDatabaseId({ FIRESTORE_DATABASE_ID: "" } as unknown as NodeJS.ProcessEnv), "(default)");
+});
+
+test("resolveGeminiModel: defaults to a stable GA model, not the unreliable gemini-3.5-flash", () => {
+  assert.equal(resolveGeminiModel({} as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
+  assert.equal(DEFAULT_GEMINI_MODEL, "gemini-2.5-flash");
+  assert.notEqual(DEFAULT_GEMINI_MODEL, "gemini-3.5-flash");
+});
+
+test("resolveGeminiModel: honors the GEMINI_MODEL override (applies to analyzer + extractor alike)", () => {
+  assert.equal(resolveGeminiModel({ GEMINI_MODEL: "gemini-2.0-flash" } as unknown as NodeJS.ProcessEnv), "gemini-2.0-flash");
+});
+
+test("resolveGeminiModel: empty/whitespace falls back to the default", () => {
+  assert.equal(resolveGeminiModel({ GEMINI_MODEL: "" } as unknown as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
+  assert.equal(resolveGeminiModel({ GEMINI_MODEL: "  " } as unknown as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
 });

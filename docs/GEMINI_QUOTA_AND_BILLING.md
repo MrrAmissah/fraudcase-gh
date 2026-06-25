@@ -76,7 +76,7 @@ Log structured events (no content):
 | Variable | Purpose |
 |---|---|
 | `GEMINI_API_KEY` | Server-only; from Secret Manager in prod |
-| `GEMINI_MODEL` | Optional override (default `gemini-3.5-flash`) |
+| `GEMINI_MODEL` | Optional override (default `gemini-2.5-flash`) |
 | `GEMINI_MAX_DAILY_REQUESTS` | Optional app-level cap (Sprint 2) |
 | `GEMINI_ANALYSIS_TIMEOUT_MS` | Optional per-call analysis timeout (ms); default 15000; slow Gemini falls back to the heuristic |
 | `MULTIMODAL_EXTRACTION_ENABLED` | Master switch for private image/PDF extraction (Sprint 3). Default off; only `true` enables. |

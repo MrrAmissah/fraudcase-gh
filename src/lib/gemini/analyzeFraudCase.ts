@@ -5,9 +5,11 @@ import { EvidenceItem } from "../../types/evidence";
 import { FraudAnalysis } from "../../types/analysis";
 import { logEvent, safeErrorType } from "../observability/logger";
 import { withTimeout, GeminiTimeoutError } from "./withTimeout";
+import { resolveGeminiModel } from "../config/runtimeConfig";
 
-// Server-side Gemini model id. Centralised so it can be verified/swapped in one place and named in logs.
-const GEMINI_MODEL = "gemini-3.5-flash";
+// Server-side Gemini model id is resolved from GEMINI_MODEL (or a stable default) at call time,
+// shared with the multimodal extractor (see src/lib/config/runtimeConfig.ts). Previously this was
+// hardcoded and ignored the env override.
 
 // Initialize GoogleGenAI client lazily. IMPORTANT: the key is read at CALL TIME (not at module load)
 // so analysis works regardless of when dotenv.config() runs relative to this module being imported.
@@ -79,7 +81,7 @@ export async function analyzeFraudCase(
     // BEFORE the public route timeout fires. A late Gemini resolution is ignored (see withTimeout).
     const response = await withTimeout(
       client.models.generateContent({
-        model: GEMINI_MODEL,
+        model: resolveGeminiModel(),
         contents: fullPrompt,
         config: {
           responseMimeType: "application/json",
