@@ -1,8 +1,8 @@
 # Threat Intelligence Enrichment and Fraud Alerts Plan
 
 **Status:** Plan only (not implemented)  
-**Parent:** [`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md)  
-**Related:** [`AGENT_PLAYBOOK.md`](./AGENT_PLAYBOOK.md), [`PRODUCTION_DEFINITION_OF_DONE.md`](./PRODUCTION_DEFINITION_OF_DONE.md)
+**Parent:** `PRODUCTION_PLAN.md`  
+**Related:** `AGENT_PLAYBOOK.md`, `PRODUCTION_DEFINITION_OF_DONE.md`
 
 This document captures the technical design for adding external/internal reputation enrichment and curated fraud alerts to FraudCase GH. It is a roadmap. No providers are implemented yet.
 

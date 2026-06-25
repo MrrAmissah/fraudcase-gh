@@ -1,8 +1,8 @@
 # Deployment and Rollback Runbook
 
 **Status:** Sprint 2  
-**Parent:** [`PRODUCTION_PLAN.md`](./PRODUCTION_PLAN.md)  
-**Related:** [`PRODUCTION_ENV_CHECKLIST.md`](./PRODUCTION_ENV_CHECKLIST.md), [`APP_CHECK_IMPLEMENTATION_PLAN.md`](./APP_CHECK_IMPLEMENTATION_PLAN.md), [`SHARED_RATE_LIMIT_PLAN.md`](./SHARED_RATE_LIMIT_PLAN.md), [`GEMINI_QUOTA_AND_BILLING.md`](./GEMINI_QUOTA_AND_BILLING.md)
+**Parent:** `PRODUCTION_PLAN.md`  
+**Related:** `PRODUCTION_ENV_CHECKLIST.md`, `APP_CHECK_IMPLEMENTATION_PLAN.md`, `SHARED_RATE_LIMIT_PLAN.md`, `GEMINI_QUOTA_AND_BILLING.md`
 
 Operational runbook for deploying FraudCase GH and rolling back safely. Never commit real secrets; inject them at runtime (Secret Manager / platform env).
 
@@ -24,7 +24,7 @@ The server binds `0.0.0.0:3000`. Client `VITE_*` values are inlined at build tim
 
 ## 2. Pre-deploy checklist
 
-Run the gate in [`PRODUCTION_ENV_CHECKLIST.md`](./PRODUCTION_ENV_CHECKLIST.md) and confirm:
+Run the gate in `PRODUCTION_ENV_CHECKLIST.md` and confirm:
 
 - `npm run check:env`, `npm test`, `npm run lint`, `npm run build` all pass.
 - Secrets are injected at runtime, not baked into the image.
@@ -74,7 +74,7 @@ These rules, not key secrecy, are the data boundary. The Firebase web API key is
 
 ## 7. Gemini billing and quota
 
-Per [`GEMINI_QUOTA_AND_BILLING.md`](./GEMINI_QUOTA_AND_BILLING.md):
+Per `GEMINI_QUOTA_AND_BILLING.md`:
 
 - GCP budget alerts at 50/80/100%.
 - Conservative daily Gemini quotas at launch.
