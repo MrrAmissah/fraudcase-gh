@@ -52,18 +52,22 @@ export function normalizeUrl(raw: string): NormalizedUrl | null {
   const host = u.hostname.toLowerCase();
   const { domain, tld, isPunycode } = normalizeDomain(host);
 
-  let hasTokenParams = false;
-  for (const [k] of u.searchParams) {
-    const kk = k.toLowerCase();
-    if (TOKEN_PARAM_HINTS.some((hint) => kk.includes(hint))) {
-      hasTokenParams = true;
-      break;
-    }
-  }
+  const isTokenParam = (key: string): boolean => {
+    const kk = key.toLowerCase();
+    return TOKEN_PARAM_HINTS.some((hint) => kk.includes(hint));
+  };
 
+  let hasTokenParams = false;
+  // Drop tracking params AND secret-bearing params, so the normalized value never carries a token.
+  // We still flag hasTokenParams so the caller can mark the indicator do_not_send_external.
   const keep = new URLSearchParams();
   for (const [k, v] of u.searchParams) {
-    if (!TRACKING_PARAMS.has(k.toLowerCase())) keep.set(k, v);
+    if (isTokenParam(k)) {
+      hasTokenParams = true;
+      continue;
+    }
+    if (TRACKING_PARAMS.has(k.toLowerCase())) continue;
+    keep.set(k, v);
   }
   const qs = keep.toString();
   const path = u.pathname.replace(/\/+$/, "");

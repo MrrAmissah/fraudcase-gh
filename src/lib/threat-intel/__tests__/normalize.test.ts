@@ -12,12 +12,22 @@ test("normalizeUrl: lowercases host, drops tracking params, keeps path", () => {
   assert.equal(n.hasTokenParams, false);
 });
 
-test("normalizeUrl: adds scheme to bare host, flags token params", () => {
+test("normalizeUrl: adds scheme to bare host, flags + STRIPS token params", () => {
   const n = normalizeUrl("pay-momo.example.tk/reset?token=abc123");
   assert.ok(n);
   assert.equal(n.domain, "pay-momo.example.tk");
   assert.equal(n.tld, "tk");
   assert.equal(n.hasTokenParams, true);
+  // the secret must NOT survive into the normalized (stored/displayed) value
+  assert.ok(!n.normalizedUrl.includes("abc123"));
+  assert.ok(!n.normalizedUrl.toLowerCase().includes("token"));
+});
+
+test("normalizeUrl: drops only token params, keeps benign ones", () => {
+  const n = normalizeUrl("https://example.com/r?token=SECRET&page=2");
+  assert.ok(n);
+  assert.ok(!n.normalizedUrl.includes("SECRET"));
+  assert.ok(n.normalizedUrl.includes("page=2"));
 });
 
 test("normalizeUrl: rejects non-http(s) and junk", () => {

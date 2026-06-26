@@ -18,15 +18,26 @@ export function aggregateVerdicts(verdicts: ProviderVerdict[]): AggregateStatus 
   return strong ? "possible_match" : "needs_verification";
 }
 
+/** Group key so a URL and its derived domain (same host) are scored/listed once, not twice. */
+function hostKey(s: ThreatIntelSignal): string {
+  return s.indicator.domain || s.indicator.normalizedValue;
+}
+
 export function riskLabelFromSignals(signals: ThreatIntelSignal[]): {
   label: ThreatRiskLabel;
   contribution: number;
 } {
-  let score = 0;
+  const rank: Record<string, number> = { possible_match: 2, needs_verification: 1 };
+  // De-duplicate by host: take the strongest status per host so url+domain pairs don't double-count.
+  const byHost = new Map<string, number>();
   for (const s of signals) {
-    if (s.aggregateStatus === "possible_match") score += 0.4;
-    else if (s.aggregateStatus === "needs_verification") score += 0.2;
+    const r = rank[s.aggregateStatus] || 0;
+    if (r === 0) continue;
+    const key = hostKey(s);
+    byHost.set(key, Math.max(byHost.get(key) || 0, r));
   }
+  let score = 0;
+  for (const r of byHost.values()) score += r === 2 ? 0.4 : 0.2;
   const contribution = Math.min(1, score);
   let label: ThreatRiskLabel = "low";
   if (contribution >= 0.8) label = "critical";
@@ -40,13 +51,21 @@ export function userFacingSummary(signals: ThreatIntelSignal[]): string {
   const flagged = signals.filter(
     (s) => s.aggregateStatus === "possible_match" || s.aggregateStatus === "needs_verification",
   );
-  if (flagged.length === 0) {
+  // De-duplicate by host (prefer the URL indicator's value) so one link isn't listed twice.
+  const byHost = new Map<string, ThreatIntelSignal>();
+  for (const s of flagged) {
+    const key = hostKey(s);
+    const existing = byHost.get(key);
+    if (!existing || (s.indicator.type === "url" && existing.indicator.type !== "url")) byHost.set(key, s);
+  }
+  const unique = [...byHost.values()];
+  if (unique.length === 0) {
     return `No ${THREAT_INTEL_WORDING.externalSignal}s were found for the links in this evidence. ${THREAT_INTEL_WORDING.notSafeNote}`;
   }
-  const items = flagged
+  const items = unique
     .map((s) => `${s.indicator.value} (${THREAT_INTEL_WORDING.possibleMatch}, ${THREAT_INTEL_WORDING.needsVerification})`)
     .join("; ");
-  return `${flagged.length} ${THREAT_INTEL_WORDING.externalSignal}(s) need review: ${items}. These are possible matches that need verification, not confirmation of fraud.`;
+  return `${unique.length} ${THREAT_INTEL_WORDING.externalSignal}(s) need review: ${items}. These are possible matches that need verification, not confirmation of fraud.`;
 }
 
 /** Structured notes the analysis model MAY reference but must never invent. */
