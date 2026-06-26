@@ -33,6 +33,14 @@ test("does not extract amounts / filenames / names as domains", () => {
   assert.equal(inds.filter((i) => i.type === "domain").length, 0);
 });
 
+test("path-token / signed-link URLs are do_not_send_external (not just query tokens)", () => {
+  const inds = extractIndicators("reset here https://example.com/reset/SECRET123 now");
+  const url = inds.find((i) => i.type === "url");
+  assert.ok(url);
+  assert.equal(url.privacyClass, "do_not_send_external");
+  assert.ok(!url.value.includes("SECRET123"));
+});
+
 test("masked/local phones become internal-only phone indicators", () => {
   const inds = extractIndicators("Contact shown: 0244***019");
   const phone = inds.find((i) => i.type === "phone");
