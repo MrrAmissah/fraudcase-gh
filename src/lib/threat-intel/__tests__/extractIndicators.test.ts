@@ -12,11 +12,25 @@ test("extracts url + domain indicators and de-dupes", () => {
   assert.equal(urls[0].privacyClass, "public");
 });
 
-test("token/signed URLs are classed do_not_send_external", () => {
+test("token/signed URLs are do_not_send_external AND never carry the secret in the value", () => {
   const inds = extractIndicators("reset here https://example.com/r?token=SECRET123");
   const url = inds.find((i) => i.type === "url");
   assert.ok(url);
   assert.equal(url.privacyClass, "do_not_send_external");
+  assert.ok(!url.value.includes("SECRET123"), "token value must not be stored/displayed");
+  assert.ok(!url.normalizedValue.includes("SECRET123"));
+});
+
+test("extracts bare domains (with a path or a recognized TLD)", () => {
+  const inds = extractIndicators("Pay at gh-post-delivery.xyz/fee and visit example.com today");
+  const domains = inds.filter((i) => i.type === "domain").map((d) => d.value);
+  assert.ok(domains.includes("gh-post-delivery.xyz"));
+  assert.ok(domains.includes("example.com"));
+});
+
+test("does not extract amounts / filenames / names as domains", () => {
+  const inds = extractIndicators("Received GHS 12.50, see report.pdf from Mr.Smith");
+  assert.equal(inds.filter((i) => i.type === "domain").length, 0);
 });
 
 test("masked/local phones become internal-only phone indicators", () => {

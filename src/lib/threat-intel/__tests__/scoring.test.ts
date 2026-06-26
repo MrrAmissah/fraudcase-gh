@@ -39,11 +39,19 @@ test("aggregateVerdicts: handles match/no_match/unknown/error/rate_limited", () 
 });
 
 test("risk label scales with signal strength", () => {
-  const sig = (s: ThreatIntelSignal["aggregateStatus"]): ThreatIntelSignal => ({ indicator: urlInd("x.xyz", "xyz"), verdicts: [], aggregateStatus: s });
+  const sig = (s: ThreatIntelSignal["aggregateStatus"], host = "x.xyz"): ThreatIntelSignal => ({ indicator: urlInd(host, "xyz"), verdicts: [], aggregateStatus: s });
   assert.equal(riskLabelFromSignals([]).label, "low");
   assert.equal(riskLabelFromSignals([sig("needs_verification")]).label, "caution");
   assert.equal(riskLabelFromSignals([sig("possible_match")]).label, "elevated");
-  assert.equal(riskLabelFromSignals([sig("possible_match"), sig("possible_match")]).label, "critical");
+  // two DISTINCT hosts -> 0.8 -> critical
+  assert.equal(riskLabelFromSignals([sig("possible_match", "a.xyz"), sig("possible_match", "b.xyz")]).label, "critical");
+});
+
+test("risk scoring de-duplicates a url + its derived domain (same host counts once)", () => {
+  const urlSig: ThreatIntelSignal = { indicator: { type: "url", value: "https://mtn-verify.xyz/login", normalizedValue: "https://mtn-verify.xyz/login", confidence: 0.9, privacyClass: "public", domain: "mtn-verify.xyz", tld: "xyz" }, verdicts: [], aggregateStatus: "possible_match" };
+  const domSig: ThreatIntelSignal = { indicator: urlInd("mtn-verify.xyz", "xyz"), verdicts: [], aggregateStatus: "possible_match" };
+  // both describe the same host -> counted once (0.4 -> elevated), not twice (would be critical)
+  assert.equal(riskLabelFromSignals([urlSig, domSig]).label, "elevated");
 });
 
 test("user-facing summary is non-accusatory; no-match language is safe", () => {
