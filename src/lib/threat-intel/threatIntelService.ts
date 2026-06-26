@@ -9,7 +9,11 @@
 import { extractIndicators } from "./extractIndicators";
 import { localHeuristicsVerdict } from "./providers/localHeuristicsProvider";
 import { aggregateVerdicts, riskLabelFromSignals, userFacingSummary, modelNotes } from "./threatIntelScoring";
-import { ProviderVerdict, ThreatIntelEnrichmentResult, ThreatIntelSignal } from "./types";
+import { ExtractedIndicator, ProviderVerdict, ThreatIntelEnrichmentResult, ThreatIntelSignal } from "./types";
+import { dispatchProviderLookups } from "./providerDispatch";
+import { ThreatIntelProvider, providerTimeoutMs } from "./providers/providerTypes";
+import { ReputationCache } from "./reputationCache";
+import { ExternalLookupStatus } from "./riskSignalsViewModel";
 
 /** Feature flag: only the literal "true" enables threat-intel (default OFF), mirroring other gates. */
 export function isThreatIntelEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
@@ -61,4 +65,45 @@ export function enrichThreatIntel(input: EnrichInput): ThreatIntelEnrichmentResu
     analysisNotesForModel: modelNotes(signals),
     privacyWarnings,
   };
+}
+
+export interface ExternalLookupDeps {
+  /** Injected so tests run on mocks; nothing reaches the network unmocked. */
+  fetchImpl: typeof fetch;
+  providers: ThreatIntelProvider[];
+  cache?: ReputationCache;
+}
+
+export interface ExternalLookupResult {
+  status: ExternalLookupStatus;
+  verdictsByIndicator: Map<string, ProviderVerdict[]>;
+}
+
+/**
+ * Run external reputation providers over ALREADY-EXTRACTED, accepted-fact indicators.
+ *
+ * Gated: returns `not_checked` (and calls nothing) unless THREAT_INTEL_EXTERNAL_LOOKUPS is true AND at
+ * least one provider is enabled (flag + key). `do_not_send_external` indicators are withheld by the
+ * dispatcher. Never throws; provider failures degrade to `unavailable`. A no-match is reported as
+ * `no_match` ("No external match returned"), never "safe".
+ */
+export async function runExternalLookups(
+  indicators: ExtractedIndicator[],
+  env: NodeJS.ProcessEnv,
+  deps: ExternalLookupDeps,
+): Promise<ExternalLookupResult> {
+  const empty = new Map<string, ProviderVerdict[]>();
+  if (!isThreatIntelExternalEnabled(env)) return { status: "not_checked", verdictsByIndicator: empty };
+
+  const enabled = deps.providers.filter((p) => p.isEnabled(env));
+  if (enabled.length === 0) return { status: "unavailable", verdictsByIndicator: empty };
+
+  const ctx = { fetchImpl: deps.fetchImpl, timeoutMs: providerTimeoutMs(env), env };
+  const { verdictsByIndicator } = await dispatchProviderLookups(indicators, enabled, ctx, deps.cache);
+
+  const all = [...verdictsByIndicator.values()].flat();
+  if (all.length === 0) return { status: "not_checked", verdictsByIndicator }; // nothing checkable
+  if (all.some((v) => v.status === "match")) return { status: "match", verdictsByIndicator };
+  if (all.some((v) => v.status === "no_match")) return { status: "no_match", verdictsByIndicator };
+  return { status: "unavailable", verdictsByIndicator }; // only errors / rate limits
 }

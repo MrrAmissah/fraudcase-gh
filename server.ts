@@ -22,9 +22,18 @@ import {
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { applyFactVerification } from "./src/lib/extraction/verification";
 import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems, acceptedFactsText } from "./src/lib/extraction/sourceMapping";
-import { isThreatIntelEnabled, enrichThreatIntel } from "./src/lib/threat-intel/threatIntelService";
+import { isThreatIntelEnabled, enrichThreatIntel, runExternalLookups } from "./src/lib/threat-intel/threatIntelService";
 import { buildRiskSignalsViewModel } from "./src/lib/threat-intel/riskSignalsViewModel";
+import { webRiskProvider } from "./src/lib/threat-intel/providers/webRiskProvider";
+import { virusTotalProvider } from "./src/lib/threat-intel/providers/virusTotalProvider";
+import { abuseIpdbProviderStub, urlscanProviderStub } from "./src/lib/threat-intel/providers/futureProviders";
+import { createMemoryCache } from "./src/lib/threat-intel/reputationCache";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
+
+// Threat-intel provider registry + a process-lifetime verdict cache. Providers stay disabled until
+// their flag + key are set (see runExternalLookups); none are called while external lookups are off.
+const THREAT_INTEL_PROVIDERS = [webRiskProvider, virusTotalProvider, abuseIpdbProviderStub, urlscanProviderStub];
+const threatIntelCache = createMemoryCache();
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
 import { createCaptchaMiddleware } from "./src/lib/security/captcha";
@@ -1171,12 +1180,23 @@ async function startServer() {
           [...(caseData.evidenceItems || []), ...acceptedFactItems]
         );
 
-        // Threat-intel risk signals (Tier-0 local heuristics) over ACCEPTED facts only. Flag-gated and
-        // ships dark: nothing renders until THREAT_INTEL_ENABLED=true. No external provider is called.
+        // Threat-intel risk signals over ACCEPTED facts only. Flag-gated (ships dark until
+        // THREAT_INTEL_ENABLED). External providers run ONLY when THREAT_INTEL_EXTERNAL_LOOKUPS=true and
+        // a provider flag+key are set; otherwise external stays "Not checked" and nothing is sent out.
+        // do_not_send_external indicators (tokens/PII/phones) are withheld at dispatch.
         let riskSignals: ReturnType<typeof buildRiskSignalsViewModel> | undefined;
         if (isThreatIntelEnabled()) {
           const enrichment = enrichThreatIntel({ text: acceptedFactsText(analysisBundle) });
-          riskSignals = buildRiskSignalsViewModel(enrichment, { enabled: true, externalStatus: "not_checked" });
+          const external = await runExternalLookups(enrichment.indicators, process.env, {
+            fetchImpl: fetch,
+            providers: THREAT_INTEL_PROVIDERS,
+            cache: threatIntelCache,
+          });
+          riskSignals = buildRiskSignalsViewModel(enrichment, {
+            enabled: true,
+            externalStatus: external.status,
+            externalVerdicts: external.verdictsByIndicator,
+          });
         }
 
         const updates = {

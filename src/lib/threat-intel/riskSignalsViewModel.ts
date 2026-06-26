@@ -6,6 +6,7 @@
 import {
   AggregateStatus,
   IndicatorType,
+  ProviderVerdict,
   ReputationProviderName,
   ThreatIntelEnrichmentResult,
   ThreatRiskLabel,
@@ -56,7 +57,13 @@ function externalLabel(status: ExternalLookupStatus): string {
 
 export function buildRiskSignalsViewModel(
   result: ThreatIntelEnrichmentResult,
-  opts: { enabled?: boolean; externalStatus?: ExternalLookupStatus; now?: () => string } = {},
+  opts: {
+    enabled?: boolean;
+    externalStatus?: ExternalLookupStatus;
+    /** Provider verdicts keyed by indicator.normalizedValue (from runExternalLookups). */
+    externalVerdicts?: Map<string, ProviderVerdict[]>;
+    now?: () => string;
+  } = {},
 ): RiskSignalsViewModel {
   const now = opts.now || (() => new Date().toISOString());
   const externalStatus: ExternalLookupStatus = opts.externalStatus || "not_checked";
@@ -94,10 +101,32 @@ export function buildRiskSignalsViewModel(
     }
   }
 
+  // Map provider MATCH verdicts into external signals (labeled by provider, non-accusatory).
+  const indicatorByValue = new Map(result.indicators.map((i) => [i.normalizedValue, i]));
+  const externalSignals: RiskSignalView[] = [];
+  if (opts.externalVerdicts) {
+    for (const [normValue, verdicts] of opts.externalVerdicts) {
+      for (const v of verdicts) {
+        if (v.status !== "match") continue;
+        const ind = indicatorByValue.get(normValue);
+        externalSignals.push({
+          id: `ext-${v.provider}-${normValue}`,
+          indicatorType: ind?.type || "url",
+          sourceType: "external_provider",
+          provider: v.provider,
+          severity: v.confidence >= 0.7 ? "high" : "elevated",
+          confidence: v.confidence,
+          safeDisplayValue: ind?.value || normValue,
+          explanation: v.rawScoreSummary || THREAT_INTEL_WORDING.providerMatch,
+        });
+      }
+    }
+  }
+
   return {
     enabled: opts.enabled ?? true,
     localIndicators,
-    external: { status: externalStatus, label: externalLabel(externalStatus), signals: [] },
+    external: { status: externalStatus, label: externalLabel(externalStatus), signals: externalSignals },
     riskLabel: result.riskLabel,
     summary: result.userFacingSummary,
     privacyWarnings: result.privacyWarnings,
