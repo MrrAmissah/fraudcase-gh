@@ -56,10 +56,11 @@ test("risk scoring de-duplicates a url + its derived domain (same host counts on
 
 test("user-facing summary is non-accusatory; no-match language is safe", () => {
   const none = userFacingSummary([]);
-  assert.match(none, /not found in this source|No external reputation signal/i);
-  assert.match(none, /does not mean this is safe/i);
+  assert.match(none, /No local indicators detected/i);
+  assert.ok(!/\b(safe|clean)\b/i.test(none), 'no-match must not say "safe"/"clean"');
 
   const flagged = userFacingSummary([{ indicator: urlInd("x.xyz", "xyz"), verdicts: [], aggregateStatus: "possible_match" }]);
   for (const p of FORBIDDEN_PHRASES) assert.ok(!flagged.toLowerCase().includes(p), `must not say "${p}"`);
+  assert.ok(!/\b(safe|clean)\b/i.test(flagged), 'must not say "safe"/"clean"');
   assert.match(flagged, /possible match|needs verification/i);
 });

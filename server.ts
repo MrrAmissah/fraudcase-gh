@@ -21,7 +21,9 @@ import {
 } from "./src/lib/extraction/extractionPipeline";
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { applyFactVerification } from "./src/lib/extraction/verification";
-import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems } from "./src/lib/extraction/sourceMapping";
+import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems, acceptedFactsText } from "./src/lib/extraction/sourceMapping";
+import { isThreatIntelEnabled, enrichThreatIntel } from "./src/lib/threat-intel/threatIntelService";
+import { buildRiskSignalsViewModel } from "./src/lib/threat-intel/riskSignalsViewModel";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
@@ -1138,17 +1140,25 @@ async function startServer() {
         // passed as-is (image/PDF items carry no redactedText, so they contribute nothing on their
         // own), and accepted facts are appended as synthetic redacted items. Unaccepted suggestions
         // and rejected facts never reach the analyzer.
-        const acceptedFactItems = bundleToAnalysisEvidenceItems(
-          buildAnalysisInputBundle(id, req.user.uid, caseData.evidenceItems || []),
-        );
+        const analysisBundle = buildAnalysisInputBundle(id, req.user.uid, caseData.evidenceItems || []);
+        const acceptedFactItems = bundleToAnalysisEvidenceItems(analysisBundle);
         const analysisResult = await analyzeFraudCase(
           caseData.title || "",
           caseData.description || "",
           [...(caseData.evidenceItems || []), ...acceptedFactItems]
         );
 
+        // Threat-intel risk signals (Tier-0 local heuristics) over ACCEPTED facts only. Flag-gated and
+        // ships dark: nothing renders until THREAT_INTEL_ENABLED=true. No external provider is called.
+        let riskSignals: ReturnType<typeof buildRiskSignalsViewModel> | undefined;
+        if (isThreatIntelEnabled()) {
+          const enrichment = enrichThreatIntel({ text: acceptedFactsText(analysisBundle) });
+          riskSignals = buildRiskSignalsViewModel(enrichment, { enabled: true, externalStatus: "not_checked" });
+        }
+
         const updates = {
           analysis: analysisResult,
+          ...(riskSignals ? { riskSignals } : {}),
           status: "analyzed" as const,
           updatedAt: new Date().toISOString(),
         };

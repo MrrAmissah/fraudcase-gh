@@ -60,20 +60,20 @@ export function userFacingSummary(signals: ThreatIntelSignal[]): string {
   }
   const unique = [...byHost.values()];
   if (unique.length === 0) {
-    return `No ${THREAT_INTEL_WORDING.externalSignal}s were found for the links in this evidence. ${THREAT_INTEL_WORDING.notSafeNote}`;
+    return `${THREAT_INTEL_WORDING.noLocalIndicators}.`;
   }
   const items = unique
     .map((s) => `${s.indicator.value} (${THREAT_INTEL_WORDING.possibleMatch}, ${THREAT_INTEL_WORDING.needsVerification})`)
     .join("; ");
-  return `${unique.length} ${THREAT_INTEL_WORDING.externalSignal}(s) need review: ${items}. These are possible matches that need verification, not confirmation of fraud.`;
+  return `${unique.length} local risk indicator(s) need review: ${items}. These are possible matches that need verification, not proof.`;
 }
 
 /** Structured notes the analysis model MAY reference but must never invent. */
 export function modelNotes(signals: ThreatIntelSignal[]): string {
-  if (signals.length === 0) return "No indicators were extracted; no external reputation signals available.";
+  if (signals.length === 0) return "No local risk indicators were extracted from accepted facts.";
   const lines = signals.map((s) => {
     const why = s.verdicts.map((v) => `${v.provider}:${v.status}${v.rawScoreSummary ? ` (${v.rawScoreSummary})` : ""}`).join(", ");
     return `- ${s.indicator.type} ${s.indicator.value}: ${s.aggregateStatus} [${why || "no checks"}]`;
   });
-  return ["External reputation signals (grounded; do not invent beyond these):", ...lines].join("\n");
+  return ["Local risk indicators (supporting context only; do not invent beyond these):", ...lines].join("\n");
 }

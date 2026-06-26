@@ -29,18 +29,20 @@ test("enrich on scam-like redacted text: flags lookalike, withholds token URL + 
   assert.ok(r.privacyWarnings.length >= 1);
 });
 
-test("output never contains forbidden/accusatory wording", () => {
+test("output never contains forbidden/accusatory wording (incl. whole-word safe/clean)", () => {
   const r = enrichThreatIntel({ text: "https://mtn-verify-momo.tk/login and https://bit.ly/abc" });
-  const blob = `${r.userFacingSummary}\n${r.analysisNotesForModel}\n${r.privacyWarnings.join("\n")}`.toLowerCase();
-  for (const p of FORBIDDEN_PHRASES) assert.ok(!blob.includes(p), `output must not contain "${p}"`);
+  const blob = `${r.userFacingSummary}\n${r.analysisNotesForModel}\n${r.privacyWarnings.join("\n")}`;
+  for (const p of FORBIDDEN_PHRASES) assert.ok(!blob.toLowerCase().includes(p), `output must not contain "${p}"`);
+  assert.ok(!/\b(safe|clean)\b/i.test(blob), 'output must not describe anything as "safe"/"clean"');
 });
 
-test("clean input degrades gracefully (no signals, low risk, safe no-match wording)", () => {
+test("benign input degrades gracefully (no signals, low risk, no 'safe' wording)", () => {
   const r = enrichThreatIntel({ text: "Thanks for your help yesterday." });
   assert.equal(r.indicators.length, 0);
   assert.equal(r.riskLabel, "low");
   assert.equal(r.riskContribution, 0);
-  assert.match(r.userFacingSummary, /does not mean this is safe/i);
+  assert.match(r.userFacingSummary, /No local indicators detected/i);
+  assert.ok(!/\b(safe|clean)\b/i.test(r.userFacingSummary));
 });
 
 test("enrich never throws on empty/garbage input", () => {

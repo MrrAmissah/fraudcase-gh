@@ -165,7 +165,7 @@ No secret values are shown here. See `.env.example`; real values belong only in 
 ## Roadmap
 
 - **Done & live:** Quick Check, private cases, AI analysis, **multimodal extraction + verification workspace**, community signals + admin review, PDF export, Vercel + Cloud Run + Vertex AI deployment.
-- **Next:** **Threat-intelligence enrichment** — check user-verified facts (URLs/domains/phones) against external reputation sources with careful "external reputation signal / possible match / not confirmed" wording. Design: [`docs/THREAT_INTEL_ENRICHMENT_PLAN.md`](docs/THREAT_INTEL_ENRICHMENT_PLAN.md).
+- **In progress:** **Threat-intelligence "Risk signals"** — Tier-0 local indicators + UI panel and passive Web Risk / VirusTotal providers, all **behind default-off flags** (accepted-facts-only, server-side, non-accusatory). Setup/status: [`docs/THREAT_INTEL_PROVIDERS.md`](docs/THREAT_INTEL_PROVIDERS.md); design: [`docs/THREAT_INTEL_ENRICHMENT_PLAN.md`](docs/THREAT_INTEL_ENRICHMENT_PLAN.md).
 - **Hardening:** shared rate limiter, App Check / CAPTCHA, deployed rules + route owner-isolation tests, abuse/load/prompt-injection suite.
 - **Product:** custom domain, signed URLs for evidence files, multi-language (Twi/Pidgin) extraction, scoped case sharing, optional reporting integrations.
 
@@ -178,7 +178,8 @@ No secret values are shown here. See `.env.example`; real values belong only in 
 - [`docs/STORAGE_RULES.md`](docs/STORAGE_RULES.md) — Cloud Storage rules
 - [`docs/VERCEL_DEPLOY.md`](docs/VERCEL_DEPLOY.md) — frontend hosting
 - [`docs/DEPLOYMENT_RUNBOOK.md`](docs/DEPLOYMENT_RUNBOOK.md) — backend deploy & rollback
-- [`docs/THREAT_INTEL_ENRICHMENT_PLAN.md`](docs/THREAT_INTEL_ENRICHMENT_PLAN.md) — next-feature design
+- [`docs/THREAT_INTEL_ENRICHMENT_PLAN.md`](docs/THREAT_INTEL_ENRICHMENT_PLAN.md) — threat-intel design/roadmap
+- [`docs/THREAT_INTEL_PROVIDERS.md`](docs/THREAT_INTEL_PROVIDERS.md) — provider setup, status & privacy invariants
 - [`SECURITY.md`](SECURITY.md) — vulnerability disclosure
 
 ---
