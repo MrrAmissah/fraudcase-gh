@@ -40,3 +40,23 @@ test("normalizeDomain: strips www, detects punycode + tld", () => {
   assert.deepEqual(normalizeDomain("www.Foo.Bar.COM"), { domain: "foo.bar.com", tld: "com", isPunycode: false });
   assert.equal(normalizeDomain("xn--80ak6aa92e.com").isPunycode, true);
 });
+
+test("normalizeUrl: token in the PATH is flagged + redacted (reset link, opaque token)", () => {
+  const a = normalizeUrl("https://example.com/reset/SECRET123");
+  assert.ok(a);
+  assert.equal(a.hasTokenParams, true);
+  assert.ok(!a.normalizedUrl.includes("SECRET123"));
+  assert.ok(a.normalizedUrl.includes("/reset/***"));
+
+  const b = normalizeUrl("https://x.com/a8f3k2j9d8f7g6h5j4k3l2m1");
+  assert.ok(b);
+  assert.equal(b.hasTokenParams, true);
+  assert.ok(!b.normalizedUrl.includes("a8f3k2j9d8f7g6h5j4k3l2m1"));
+});
+
+test("normalizeUrl: normal word-slug paths are NOT mistaken for tokens", () => {
+  const n = normalizeUrl("https://news.example.com/blog/how-to-avoid-mobile-money-fraud-in-ghana");
+  assert.ok(n);
+  assert.equal(n.hasTokenParams, false);
+  assert.ok(n.normalizedUrl.includes("how-to-avoid-mobile-money-fraud-in-ghana"));
+});

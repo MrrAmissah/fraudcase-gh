@@ -11,6 +11,20 @@ const TOKEN_PARAM_HINTS = [
   "password", "pwd", "access_token", "id_token", "key", "secret", "verify", "reset",
 ];
 
+/** Path keywords whose FOLLOWING segment is treated as a secret (e.g. /reset/<token>, /verify/<token>). */
+const TOKEN_PATH_KEYWORDS = new Set([
+  "reset", "verify", "confirm", "activate", "token", "auth", "invite", "magic",
+  "session", "password", "signup", "oauth", "unsubscribe", "login",
+]);
+
+/** Heuristic: a path segment that looks like an opaque secret (hex digest or long digit-rich token). */
+function looksLikeTokenSegment(seg: string): boolean {
+  if (seg.length < 20 || !/^[A-Za-z0-9_-]+$/.test(seg)) return false;
+  if (/^[a-f0-9]{20,}$/i.test(seg)) return true; // hex digest
+  const digits = (seg.match(/[0-9]/g) || []).length;
+  return digits >= 4 && /[A-Za-z]/.test(seg); // mixed alnum with several digits (not a word-slug)
+}
+
 export interface NormalizedDomain {
   domain: string;
   tld: string;
@@ -70,8 +84,24 @@ export function normalizeUrl(raw: string): NormalizedUrl | null {
     keep.set(k, v);
   }
   const qs = keep.toString();
-  const path = u.pathname.replace(/\/+$/, "");
+
+  // Redact + flag token-bearing PATH segments (signed links / reset tokens), e.g. /reset/SECRET123 or
+  // an opaque /a8f3...  Segments after a sensitive keyword, or that look like an opaque token, become ***.
+  const rawSegs = u.pathname.split("/");
+  let hasTokenPath = false;
+  const safeSegs = rawSegs.map((seg, i) => {
+    if (!seg) return seg;
+    const prev = (rawSegs[i - 1] || "").toLowerCase();
+    if (TOKEN_PATH_KEYWORDS.has(prev) || looksLikeTokenSegment(seg)) {
+      hasTokenPath = true;
+      return "***";
+    }
+    return seg;
+  });
+  const path = safeSegs.join("/").replace(/\/+$/, "");
+  // A token in the path (not just query) must also keep the URL off external providers.
+  const hasSecretMaterial = hasTokenParams || hasTokenPath;
   const normalizedUrl = `${u.protocol}//${host}${path}${qs ? `?${qs}` : ""}`;
 
-  return { normalizedUrl, host, domain, tld, isPunycode, hasTokenParams };
+  return { normalizedUrl, host, domain, tld, isPunycode, hasTokenParams: hasSecretMaterial };
 }
