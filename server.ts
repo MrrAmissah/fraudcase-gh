@@ -551,7 +551,11 @@ async function startServer() {
       };
 
       if (caseData.status === "analyzed") {
+        // Stale once evidence/facts change: drop the analysis + risk signals too, since clients gate
+        // on the presence of `analysis` (not status). Forces a re-analyze with the current inputs.
         updates.status = "draft";
+        updates.analysis = null;
+        updates.riskSignals = null;
       }
 
       await docRef.update(updates);
@@ -716,7 +720,11 @@ async function startServer() {
       };
 
       if (caseData.status === "analyzed") {
+        // Stale once evidence/facts change: drop the analysis + risk signals too, since clients gate
+        // on the presence of `analysis` (not status). Forces a re-analyze with the current inputs.
         updates.status = "draft";
+        updates.analysis = null;
+        updates.riskSignals = null;
       }
 
       await docRef.update(updates);
@@ -911,7 +919,11 @@ async function startServer() {
       };
 
       if (caseData.status === "analyzed") {
+        // Stale once evidence/facts change: drop the analysis + risk signals too, since clients gate
+        // on the presence of `analysis` (not status). Forces a re-analyze with the current inputs.
         updates.status = "draft";
+        updates.analysis = null;
+        updates.riskSignals = null;
       }
 
       await docRef.update(updates);
@@ -1107,7 +1119,11 @@ async function startServer() {
       // Accepting/rejecting a fact changes the accepted-fact set that /analyze uses, so an existing
       // analysis is now stale. Reset to draft, matching the add/delete-evidence routes.
       if (caseData.status === "analyzed") {
+        // Stale once evidence/facts change: drop the analysis + risk signals too, since clients gate
+        // on the presence of `analysis` (not status). Forces a re-analyze with the current inputs.
         updates.status = "draft";
+        updates.analysis = null;
+        updates.riskSignals = null;
       }
       await docRef.update(updates);
 
