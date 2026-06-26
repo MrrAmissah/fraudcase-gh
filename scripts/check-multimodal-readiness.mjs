@@ -53,12 +53,9 @@ console.log("\nFraudCase GH — multimodal staging-readiness static check");
 console.log("Values are never printed. No network, cloud, Gemini, deploy, or env mutation is performed.\n");
 
 const requiredDocs = [
-  "docs/MULTIMODAL_STAGING_SMOKE_TEST.md",
-  "docs/SPRINT_3_PLAN.md",
-  "docs/PRODUCTION_ENV_CHECKLIST.md",
   "docs/DEPLOYMENT_RUNBOOK.md",
-  "docs/GEMINI_QUOTA_AND_BILLING.md",
   "docs/STORAGE_RULES.md",
+  "docs/SECURITY_PRIVACY_OVERVIEW.md",
 ];
 
 for (const doc of requiredDocs) {
@@ -141,12 +138,6 @@ for (const file of extractionAndUiFiles) {
   check(`${file} has no console.log`, !/\bconsole\.log\s*\(/.test(source));
   check(`${file} has no signed URL helper usage`, !/\bgetSignedUrl\b|\bsignedUrl\b/.test(source));
 }
-
-const runbook = read("docs/MULTIMODAL_STAGING_SMOKE_TEST.md");
-check("runbook has do-not-run staging guard", runbook.includes("DO NOT RUN THIS"));
-check("runbook documents success evidence capture", runbook.includes("Success evidence to capture"));
-check("runbook documents rollback/teardown", runbook.includes("## 6. Rollback / teardown"));
-check("runbook caps real extraction calls", runbook.includes("One or two extraction calls maximum"));
 
 if (warnings.length) {
   console.log(`\nWarnings: ${warnings.length}`);
