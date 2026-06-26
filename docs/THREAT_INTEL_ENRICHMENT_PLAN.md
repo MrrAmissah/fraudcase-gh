@@ -1,10 +1,11 @@
 # Threat Intelligence Enrichment and Fraud Alerts Plan
 
-**Status:** Plan only (not implemented)  
-**Parent:** `PRODUCTION_PLAN.md`  
-**Related:** `AGENT_PLAYBOOK.md`, `PRODUCTION_DEFINITION_OF_DONE.md`
+**Status:** Partially implemented. Tier-0 local risk signals + UI panel, a provider interface, and
+passive **Web Risk** and **VirusTotal** providers are built **behind default-off flags** (no live calls
+until enabled with approval). AbuseIPDB/urlscan are scoped stubs. See
+[`THREAT_INTEL_PROVIDERS.md`](./THREAT_INTEL_PROVIDERS.md) for setup, status, and privacy invariants.
 
-This document captures the technical design for adding external/internal reputation enrichment and curated fraud alerts to FraudCase GH. It is a roadmap. No providers are implemented yet.
+This document captures the technical design for adding external/internal reputation enrichment and curated fraud alerts to FraudCase GH. It is the roadmap; the providers doc tracks what is live.
 
 Language rules for this feature (non-negotiable): use **external reputation signal**, **possible match**, **flagged by source**, **needs verification**, **not confirmed fraud**. Never use **confirmed scam**, **confirmed fraud**, or **scammer database**.
 
