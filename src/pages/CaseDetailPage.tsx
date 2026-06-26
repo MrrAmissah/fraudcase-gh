@@ -26,6 +26,7 @@ import TimelineView from "../components/TimelineView";
 import EvidenceChecklist from "../components/EvidenceChecklist";
 import AnalysisVisualSummary from "../components/analysis/AnalysisVisualSummary";
 import VerificationWorkspace from "../components/VerificationWorkspace";
+import RiskSignalsPanel from "../components/RiskSignalsPanel";
 
 interface CaseDetailPageProps {
   fraudCase: FraudCase;
@@ -61,7 +62,7 @@ export default function CaseDetailPage({
   onViewReport,
   isAnalyzing = false,
 }: CaseDetailPageProps) {
-  const { id, title, description, status, incidentDate, createdAt, updatedAt, evidenceItems, analysis } = fraudCase;
+  const { id, title, description, status, incidentDate, createdAt, updatedAt, evidenceItems, analysis, riskSignals } = fraudCase;
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [verifyingEvidenceId, setVerifyingEvidenceId] = useState<string | null>(null);
@@ -475,6 +476,9 @@ export default function CaseDetailPage({
 
               {/* Extracted Case Entities */}
               <ExtractedEntitiesTable entities={analysis.extractedEntities} />
+
+              {/* Threat-intel risk signals (renders only when THREAT_INTEL_ENABLED) */}
+              <RiskSignalsPanel riskSignals={riskSignals} />
 
               {/* Possible Fraud Indicators list */}
               <SuspiciousIndicators indicators={analysis.suspiciousIndicators} />

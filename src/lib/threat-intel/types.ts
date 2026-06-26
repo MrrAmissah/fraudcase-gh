@@ -80,20 +80,28 @@ export interface ThreatIntelEnrichmentResult {
   privacyWarnings: string[];
 }
 
-/** Approved, non-accusatory phrasing. Tests assert these and forbid "confirmed fraud/scam". */
+/** Approved, non-accusatory phrasing. Tier-0 results are LOCAL indicators, never "external checks". */
 export const THREAT_INTEL_WORDING = {
-  externalSignal: "external reputation signal",
-  possibleMatch: "possible match",
-  needsVerification: "needs verification",
-  noMatch: "not found in this source",
-  notSafeNote: "A no-match does not mean this is safe.",
+  panelTitle: "Risk signals",
+  localIndicator: "Local indicator",
+  externalReputation: "External reputation",
+  possibleMatch: "Possible match",
+  needsVerification: "Needs verification",
+  providerMatch: "Provider reported a match",
+  noLocalIndicators: "No local indicators detected",
+  noExternalMatch: "No external match returned",
+  notChecked: "Not checked",
+  unavailable: "Unavailable",
 } as const;
 
-/** Phrases that must NEVER appear in threat-intel output. */
+/**
+ * Phrases that must NEVER appear in threat-intel output. ("safe"/"clean" are also banned but checked
+ * as whole words in tests to avoid matching "safety", so they aren't listed here as substrings.)
+ */
 export const FORBIDDEN_PHRASES: readonly string[] = [
   "confirmed fraud",
   "confirmed scam",
-  "scammer database",
-  "known scammer",
+  "scammer",
+  "criminal",
   "guilty",
 ];

@@ -61,6 +61,21 @@ export function buildAnalysisInputBundle(
 }
 
 /**
+ * Text built from ONLY user-accepted facts' redacted values — the safe input for threat-intel
+ * enrichment. Deliberately excludes `redactedText` (which contains unaccepted artifact text), so
+ * indicators are never extracted from suggestions/rejected content.
+ */
+export function acceptedFactsText(bundle: AnalysisInputBundle): string {
+  const values: string[] = [];
+  for (const it of bundle.items) {
+    for (const f of it.acceptedFacts) {
+      if (f.redactedValue && f.redactedValue.trim()) values.push(f.redactedValue);
+    }
+  }
+  return values.join("\n");
+}
+
+/**
  * Convert the bundle into synthetic redacted evidence items carrying ONLY user-accepted extracted
  * content. The analyze route appends these to the case's existing text evidence before pass B.
  */
