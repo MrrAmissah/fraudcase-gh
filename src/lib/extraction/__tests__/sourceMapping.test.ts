@@ -78,19 +78,22 @@ test("unaccepted suggestion contributes ZERO text to analysis (Decision 2)", () 
   assert.equal(analysisItems.length, 0);
 });
 
-test("after acceptance, the fact and artifact text reach analysis input", () => {
+test("after acceptance, ONLY the accepted fact (not the artifact transcript) reaches analysis", () => {
   const items = [textItem, imageItem(extractedFact("accepted", true))];
   const bundle = buildAnalysisInputBundle("c1", "u1", items);
 
   const multimodal = bundle.items.find((i) => i.evidenceId === "img-1")!;
   assert.equal(multimodal.acceptedFacts.length, 1);
+  // The bundle still carries the transcript as inspection metadata...
   assert.equal(multimodal.redactedText, "MTN MoMo received GHS 1,500.00 reversal request");
   assert.equal(bundle.multimodalEvidenceSummary.acceptedFactCount, 1);
 
   const analysisItems = bundleToAnalysisEvidenceItems(bundle);
   assert.equal(analysisItems.length, 1);
-  assert.ok(analysisItems[0].redactedText!.includes("MTN MoMo received GHS 1,500.00"));
+  // ...but only the accepted fact line feeds analysis; the unaccepted transcript text is NOT dragged in.
   assert.ok(analysisItems[0].redactedText!.includes("amount: GHS 1,500.00"));
+  assert.ok(!analysisItems[0].redactedText!.includes("MTN MoMo received"));
+  assert.ok(!analysisItems[0].redactedText!.includes("reversal request"));
 });
 
 test("rejected facts never reach analysis input", () => {

@@ -34,7 +34,8 @@ export function buildAnalysisInputBundle(
       items.push({
         evidenceId: item.id,
         sourceType: artifact.sourceType,
-        // Redacted artifact text is trusted input only once the user has accepted at least one fact.
+        // Inspection metadata only — NOT analysis input. Analysis consumes accepted facts (see
+        // bundleToAnalysisEvidenceItems / acceptedFactsText), so unaccepted OCR never reaches pass B.
         redactedText: acceptedFacts.length > 0 ? artifact.redactedText : undefined,
         acceptedFacts,
       });
@@ -83,10 +84,10 @@ export function bundleToAnalysisEvidenceItems(bundle: AnalysisInputBundle): Evid
   return bundle.items
     .filter((it) => it.acceptedFacts.length > 0)
     .map((it) => {
-      const lines = [
-        it.redactedText || "",
-        ...it.acceptedFacts.map((f) => `${f.type}: ${f.redactedValue}`),
-      ].filter((l) => l.trim());
+      // Accepted facts ONLY — never the full artifact transcript. Including `redactedText` would leak
+      // unaccepted OCR (unsupported claims, embedded "ignore instructions" text) into pass B, breaking
+      // the Decision 2 no-auto-trust gate. Only user-accepted facts feed analysis.
+      const lines = it.acceptedFacts.map((f) => `${f.type}: ${f.redactedValue}`).filter((l) => l.trim());
       return {
         id: `xfacts-${it.evidenceId}`,
         caseId: bundle.caseId,

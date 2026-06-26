@@ -1103,13 +1103,20 @@ async function startServer() {
 
       const updatedItems = [...items];
       updatedItems[idx] = { ...items[idx], extractedArtifact: result.artifact };
-      await docRef.update({ evidenceItems: updatedItems, updatedAt: new Date().toISOString() });
+      const updates: Record<string, any> = { evidenceItems: updatedItems, updatedAt: new Date().toISOString() };
+      // Accepting/rejecting a fact changes the accepted-fact set that /analyze uses, so an existing
+      // analysis is now stale. Reset to draft, matching the add/delete-evidence routes.
+      if (caseData.status === "analyzed") {
+        updates.status = "draft";
+      }
+      await docRef.update(updates);
 
       res.json({
         evidenceId,
         factId,
         verificationStatus: result.fact.verificationStatus,
         verifiedByUser: result.fact.verifiedByUser,
+        status: updates.status || caseData.status,
       });
     } catch (err: any) {
       logRouteError("verify_fact", "/api/cases/:id/evidence/:evidenceId/facts/:factId", err);

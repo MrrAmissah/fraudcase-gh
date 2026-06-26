@@ -75,6 +75,10 @@ test("no-auto-trust then accept: only after acceptance does the masked fact reac
   // Still no raw phone digits in the analysis input.
   assert.ok(!JSON.stringify(analysisItems).includes("0542385934"));
   assert.ok(analysisItems[0].redactedText!.includes("amount: GHS 1,500.00"));
+  // Accepting ONE fact must not drag the rest of the artifact transcript (incl. injection text) into
+  // analysis — only the accepted fact line is present.
+  assert.ok(!JSON.stringify(analysisItems).toLowerCase().includes("ignore all previous instructions"));
+  assert.ok(!JSON.stringify(analysisItems).toLowerCase().includes(INJECTION.toLowerCase()));
 });
 
 test("owner isolation: a non-owner is blocked before any bytes are read", () => {
