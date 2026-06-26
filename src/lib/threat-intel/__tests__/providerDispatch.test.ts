@@ -22,14 +22,14 @@ function ind(
 
 function mockProvider(opts: { enabled: boolean; calls?: { n: number }; throws?: boolean }): ThreatIntelProvider {
   return {
-    name: "safe_browsing",
+    name: "web_risk",
     capabilities: { url: true, domain: true, ip: false, hash: false },
     isConfigured: () => true,
     isEnabled: () => opts.enabled,
     async lookup(): Promise<ProviderVerdict> {
       if (opts.calls) opts.calls.n++;
       if (opts.throws) throw new Error("HTTP 429 rate limit");
-      return { provider: "safe_browsing", checkedAt: "t", status: "no_match", category: "unknown", confidence: 0.3, cacheTtlSeconds: 60 };
+      return { provider: "web_risk", checkedAt: "t", status: "no_match", category: "unknown", confidence: 0.3, cacheTtlSeconds: 60 };
     },
   };
 }

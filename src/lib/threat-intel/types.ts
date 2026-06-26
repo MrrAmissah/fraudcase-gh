@@ -32,8 +32,10 @@ export type ReputationProviderName =
   | "local_heuristics"
   | "internal_signals"
   | "admin_alerts"
-  | "safe_browsing"
-  | "virustotal";
+  | "web_risk"
+  | "virustotal"
+  | "abuseipdb"
+  | "urlscan";
 
 export type VerdictStatus = "match" | "no_match" | "unknown" | "error" | "rate_limited";
 export type VerdictCategory =
