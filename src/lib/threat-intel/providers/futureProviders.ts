@@ -1,24 +1,12 @@
 /**
- * Placeholder providers — declared but NOT implemented. They carry capability metadata and stay
- * permanently disabled (no flag, no key path, no network). Each requires separate approval and a
- * passive-only design before any implementation:
+ * Placeholder provider(s) — declared but NOT implemented; permanently disabled (no flag, no key, no
+ * network) until separately approved with a passive-only design.
  *
- *  - AbuseIPDB: check ACCEPTED public IPs only; never REPORT an IP.
  *  - urlscan: search EXISTING public scans only; never AUTO-SUBMIT user-derived URLs.
  *
- * No private evidence is ever submitted to either.
+ * (AbuseIPDB is now implemented as a real check-only provider in `abuseIpdbProvider.ts`.)
  */
 import { ThreatIntelProvider, unavailableVerdict } from "./providerTypes";
-
-export const abuseIpdbProviderStub: ThreatIntelProvider = {
-  name: "abuseipdb",
-  capabilities: { url: false, domain: false, ip: true, hash: false },
-  isConfigured: () => false,
-  isEnabled: () => false,
-  async lookup() {
-    return unavailableVerdict("abuseipdb", "provider not implemented (planned: check accepted public IPs only; never report)");
-  },
-};
 
 export const urlscanProviderStub: ThreatIntelProvider = {
   name: "urlscan",

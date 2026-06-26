@@ -16,7 +16,8 @@ import { ReputationCache } from "./reputationCache";
 function kindForIndicator(type: ExtractedIndicator["type"]): LookupKind | null {
   if (type === "url") return "url";
   if (type === "domain") return "domain";
-  return null; // phones/emails/etc. are never sent to URL reputation providers
+  if (type === "ip") return "ip";
+  return null; // phones/emails/etc. are never sent to reputation providers
 }
 
 export interface DispatchResult {

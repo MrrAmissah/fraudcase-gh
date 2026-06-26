@@ -26,13 +26,14 @@ import { isThreatIntelEnabled, enrichThreatIntel, runExternalLookups } from "./s
 import { buildRiskSignalsViewModel } from "./src/lib/threat-intel/riskSignalsViewModel";
 import { webRiskProvider } from "./src/lib/threat-intel/providers/webRiskProvider";
 import { virusTotalProvider } from "./src/lib/threat-intel/providers/virusTotalProvider";
-import { abuseIpdbProviderStub, urlscanProviderStub } from "./src/lib/threat-intel/providers/futureProviders";
+import { abuseIpdbProvider } from "./src/lib/threat-intel/providers/abuseIpdbProvider";
+import { urlscanProviderStub } from "./src/lib/threat-intel/providers/futureProviders";
 import { createMemoryCache } from "./src/lib/threat-intel/reputationCache";
 import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/logger";
 
 // Threat-intel provider registry + a process-lifetime verdict cache. Providers stay disabled until
 // their flag + key are set (see runExternalLookups); none are called while external lookups are off.
-const THREAT_INTEL_PROVIDERS = [webRiskProvider, virusTotalProvider, abuseIpdbProviderStub, urlscanProviderStub];
+const THREAT_INTEL_PROVIDERS = [webRiskProvider, virusTotalProvider, abuseIpdbProvider, urlscanProviderStub];
 const threatIntelCache = createMemoryCache();
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
 import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";

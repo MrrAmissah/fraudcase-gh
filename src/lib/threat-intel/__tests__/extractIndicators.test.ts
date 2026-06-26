@@ -48,6 +48,20 @@ test("masked/local phones become internal-only phone indicators", () => {
   assert.equal(phone.privacyClass, "do_not_send_external");
 });
 
+test("extracts only routable PUBLIC IPv4; excludes private/reserved/doc/malformed", () => {
+  const text =
+    "Hits from 8.8.8.8 and 1.1.1.1; ignore 10.0.0.5, 192.168.1.1, 127.0.0.1, 169.254.1.1, " +
+    "172.16.5.5, 100.64.0.1, 224.0.0.1, 192.0.2.7, 198.51.100.9, 203.0.113.5, 999.1.1.1, 1.2.03.4";
+  const ips = extractIndicators(text).filter((i) => i.type === "ip").map((i) => i.value);
+  assert.deepEqual(ips, ["8.8.8.8", "1.1.1.1"]);
+});
+
+test("public IP indicators are privacyClass public (eligible for IP reputation)", () => {
+  const ip = extractIndicators("connect to 1.1.1.1").find((i) => i.type === "ip");
+  assert.ok(ip);
+  assert.equal(ip.privacyClass, "public");
+});
+
 test("plain text with no indicators yields nothing; never throws", () => {
   assert.deepEqual(extractIndicators("just a normal sentence"), []);
   assert.deepEqual(extractIndicators(""), []);
