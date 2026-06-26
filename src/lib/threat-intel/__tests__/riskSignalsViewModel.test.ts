@@ -2,7 +2,26 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { enrichThreatIntel } from "../threatIntelService";
 import { buildRiskSignalsViewModel } from "../riskSignalsViewModel";
-import { FORBIDDEN_PHRASES } from "../types";
+import { FORBIDDEN_PHRASES, ProviderVerdict } from "../types";
+
+test("view-model: external match verdicts -> external_provider signals (non-accusatory)", () => {
+  const enrichment = enrichThreatIntel({ text: "https://bad.xyz/login" });
+  const url = enrichment.indicators.find((i) => i.type === "url")!;
+  const verdicts = new Map<string, ProviderVerdict[]>([
+    [url.normalizedValue, [{ provider: "virustotal", checkedAt: "t", status: "match", category: "suspicious", confidence: 0.8, rawScoreSummary: "VirusTotal reported 3 malicious engine result(s)", cacheTtlSeconds: 60 }]],
+  ]);
+  const vm = buildRiskSignalsViewModel(enrichment, { enabled: true, externalStatus: "match", externalVerdicts: verdicts });
+  assert.equal(vm.external.status, "match");
+  assert.equal(vm.external.label, "Provider reported a match");
+  assert.ok(vm.external.signals.length >= 1);
+  const es = vm.external.signals[0];
+  assert.equal(es.sourceType, "external_provider");
+  assert.equal(es.provider, "virustotal");
+  assert.ok(es.explanation.toLowerCase().includes("virustotal"));
+  const blob = JSON.stringify(vm);
+  assert.ok(!/\b(safe|clean)\b/i.test(blob), "no 'safe'/'clean'");
+  assert.ok(!/confirmed (fraud|scam)|scammer|criminal/i.test(blob), "no accusatory wording");
+});
 
 test("view-model: local match -> Local indicator; external defaults to 'Not checked'", () => {
   const vm = buildRiskSignalsViewModel(
