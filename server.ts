@@ -22,6 +22,7 @@ import {
 import { isMultimodalExtractionEnabled } from "./src/lib/extraction/multimodalExtractor";
 import { applyFactVerification } from "./src/lib/extraction/verification";
 import { buildAnalysisInputBundle, bundleToAnalysisEvidenceItems, acceptedFactsText } from "./src/lib/extraction/sourceMapping";
+import { cascadeDeleteCase } from "./src/lib/cases/deleteCascade";
 import { isThreatIntelEnabled, enrichThreatIntel, runExternalLookups } from "./src/lib/threat-intel/threatIntelService";
 import { buildRiskSignalsViewModel } from "./src/lib/threat-intel/riskSignalsViewModel";
 import { webRiskProvider } from "./src/lib/threat-intel/providers/webRiskProvider";
@@ -1237,7 +1238,30 @@ async function startServer() {
         return;
       }
 
-      await docRef.delete();
+      // Cascade-purge the case's out-of-document resources (GCS evidence objects + `extractionRuns`
+      // subcollection + DEV-ONLY local backup), then delete the doc. Purges are best-effort (a
+      // transient failure is warn-logged, not fatal); the doc delete is authoritative. Storage paths
+      // are keyed under the RAW uid (see the upload route), so pass req.user.uid through unchanged.
+      await cascadeDeleteCase({
+        uid: req.user.uid,
+        caseId: id,
+        cwd: process.cwd(),
+        purgeStoragePrefix: async (prefix) => {
+          await adminStorage.bucket().deleteFiles({ prefix, force: true });
+        },
+        purgeLocalDir: (absDir) => {
+          if (fs.existsSync(absDir)) fs.rmSync(absDir, { recursive: true, force: true });
+        },
+        purgeExtractionRuns: async () => {
+          const runRefs = await docRef.collection("extractionRuns").listDocuments();
+          if (runRefs.length === 0) return;
+          const batch = adminDb.batch();
+          for (const ref of runRefs) batch.delete(ref);
+          await batch.commit();
+        },
+        deleteCaseDoc: async () => { await docRef.delete(); },
+        onPurgeError: (event, purgeErr) => logEvent({ event, level: "warn", errorType: safeErrorType(purgeErr) }),
+      });
       res.json({ success: true, message: "Case successfully destroyed." });
     } catch (err: any) {
       logRouteError("delete_case", "/api/cases/:id", err);
