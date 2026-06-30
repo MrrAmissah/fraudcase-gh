@@ -16,7 +16,8 @@ import { ReputationCache } from "./reputationCache";
 function kindForIndicator(type: ExtractedIndicator["type"]): LookupKind | null {
   if (type === "url") return "url";
   if (type === "domain") return "domain";
-  return null; // phones/emails/etc. are never sent to URL reputation providers
+  if (type === "ip") return "ip";
+  return null; // phones/emails/etc. are never sent to reputation providers
 }
 
 export interface DispatchResult {
@@ -45,7 +46,8 @@ export async function dispatchProviderLookups(
 
     const verdicts: ProviderVerdict[] = [];
     for (const provider of enabled) {
-      if (!provider.capabilities[kind]) continue;
+      const handles = provider.handlesKind ? provider.handlesKind(kind, ctx.env) : provider.capabilities[kind];
+      if (!handles) continue;
       const key = providerCacheKey(provider.name, kind, ind.normalizedValue);
       const cached = cache?.get(key);
       if (cached) {

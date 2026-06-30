@@ -6,7 +6,7 @@
  * means "not found in this source", never "safe".
  */
 
-export type IndicatorType = "url" | "domain" | "phone" | "email" | "wallet" | "shortcode";
+export type IndicatorType = "url" | "domain" | "ip" | "phone" | "email" | "wallet" | "shortcode";
 
 /**
  * Whether an indicator may be sent to an EXTERNAL reputation provider.

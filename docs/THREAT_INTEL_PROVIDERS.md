@@ -11,7 +11,7 @@ the frontend or committed.
 | 0 | Local heuristics | **Implemented** | none (network-free) | renders when `THREAT_INTEL_ENABLED=true` |
 | 2 | Google Web Risk | **Implemented** | passive `GET v1/uris:search` (URL) | off |
 | 3 | VirusTotal | **Implemented** | passive `GET /api/v3/{urls,domains,ip_addresses,files}` | off |
-| 3 | AbuseIPDB | **Planned (stub only)** | none yet | off |
+| 3 | AbuseIPDB | **Implemented** (check-only) | passive `GET /api/v2/check` (public IPv4) | off |
 | 3 | urlscan | **Planned (stub only)** | none yet | off |
 
 ## Feature flags & keys (server env)
@@ -38,7 +38,7 @@ key ⇒ calm `Unavailable`/`Not checked` status, never an error to the user.
 - Phones/emails are never sent to URL/IP reputation providers.
 - VirusTotal uses **GET reports only** — no `POST /urls` (submission) and no `POST /files` (upload).
 - urlscan (when built) will **search existing public scans only** — never auto-submit user URLs.
-- AbuseIPDB (when built) will **check accepted public IPs only** — never report an IP.
+- AbuseIPDB **checks accepted PUBLIC IPv4 only** (private/loopback/link-local/CGNAT/multicast/reserved/documentation ranges are excluded at extraction) via `GET /api/v2/check` — never the report endpoint.
 
 ## Wording (required / forbidden)
 
