@@ -96,5 +96,8 @@ export const virusTotalProvider: ThreatIntelProvider = {
   capabilities: { url: true, domain: true, ip: true, hash: true },
   isConfigured: configured,
   isEnabled: (env) => flagEnabled(env, "THREAT_INTEL_VIRUSTOTAL_ENABLED") && configured(env),
+  // IP lookups are gated behind a SEPARATE default-off flag, so VirusTotal does not start checking
+  // public-IP indicators on a deploy. AbuseIPDB is the default IP provider.
+  handlesKind: (kind, env) => (kind === "ip" ? flagEnabled(env, "THREAT_INTEL_VIRUSTOTAL_IP_ENABLED") : true),
   lookup,
 };

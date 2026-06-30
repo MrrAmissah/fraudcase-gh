@@ -46,7 +46,8 @@ export async function dispatchProviderLookups(
 
     const verdicts: ProviderVerdict[] = [];
     for (const provider of enabled) {
-      if (!provider.capabilities[kind]) continue;
+      const handles = provider.handlesKind ? provider.handlesKind(kind, ctx.env) : provider.capabilities[kind];
+      if (!handles) continue;
       const key = providerCacheKey(provider.name, kind, ind.normalizedValue);
       const cached = cache?.get(key);
       if (cached) {

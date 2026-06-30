@@ -30,6 +30,12 @@ export interface ThreatIntelProvider {
   isConfigured(env: NodeJS.ProcessEnv): boolean;
   /** Enabled = provider flag is "true" AND configured. */
   isEnabled(env: NodeJS.ProcessEnv): boolean;
+  /**
+   * Optional per-kind gate. Defaults to `capabilities[kind]`. Lets a provider that is *capable* of a
+   * kind still decline it unless a dedicated flag is set (e.g. VirusTotal declines `ip` until
+   * THREAT_INTEL_VIRUSTOTAL_IP_ENABLED=true, so AbuseIPDB is the default IP provider).
+   */
+  handlesKind?(kind: LookupKind, env: NodeJS.ProcessEnv): boolean;
   /** Passive lookup. Must never throw; returns an error/rate_limited verdict on failure. */
   lookup(kind: LookupKind, normalizedValue: string, ctx: ProviderLookupContext): Promise<ProviderVerdict>;
 }

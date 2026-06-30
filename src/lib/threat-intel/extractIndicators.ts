@@ -39,6 +39,7 @@ export function isPublicIPv4(ip: string): boolean {
   if (a === 192 && b === 168) return false;
   if (a === 100 && b >= 64 && b <= 127) return false;
   if (a >= 224) return false; // multicast (224-239) + reserved (>=240)
+  if (a === 198 && (b === 18 || b === 19)) return false; // 198.18.0.0/15 benchmarking
   if (a === 192 && b === 0 && (c === 2 || c === 0)) return false; // 192.0.2/24 doc, 192.0.0/24 IETF
   if (a === 198 && b === 51 && c === 100) return false; // 198.51.100/24 doc
   if (a === 203 && b === 0 && c === 113) return false; // 203.0.113/24 doc
@@ -62,9 +63,17 @@ export function extractIndicators(text: string, sourceEvidenceId?: string): Extr
     }
   };
 
+  // Char spans of token-bearing (do_not_send_external) URLs, so an IP-shaped token value inside one
+  // (e.g. ?token=8.8.8.8) is not re-emitted as a separate public IP and leaked to a provider.
+  const dnseSpans: Array<[number, number]> = [];
+  const record = (m: RegExpMatchArray, n: NormalizedUrl) => {
+    if (n.hasTokenParams && typeof m.index === "number") dnseSpans.push([m.index, m.index + m[0].length]);
+    push(n);
+  };
+
   for (const m of src.matchAll(URL_RE)) {
     const n = normalizeUrl(m[0]);
-    if (n) push(n);
+    if (n) record(m, n);
   }
 
   for (const m of src.matchAll(BARE_RE)) {
@@ -74,13 +83,16 @@ export function extractIndicators(text: string, sourceEvidenceId?: string): Extr
     // Reduce false positives ("Mr.Smith", "file.pdf"): require a path OR a recognized TLD.
     if (!hasPath && !COMMON_TLDS.has(tld)) continue;
     const n = normalizeUrl(m[0]);
-    if (n) push(n);
+    if (n) record(m, n);
   }
 
   for (const m of src.matchAll(IP_RE)) {
     const ip = m[0];
-    // Only routable public IPs are eligible for reputation; private/local/reserved/doc/malformed excluded.
-    if (!isPublicIPv4(ip) || seen.has(`ip:${ip}`)) continue;
+    const idx = typeof m.index === "number" ? m.index : -1;
+    const insideSecretUrl = idx >= 0 && dnseSpans.some(([s, e]) => idx >= s && idx < e);
+    // Only routable public IPs are eligible; exclude private/reserved/doc/malformed and IPs that sit
+    // inside a do_not_send_external URL (token/signed-link values).
+    if (insideSecretUrl || !isPublicIPv4(ip) || seen.has(`ip:${ip}`)) continue;
     seen.add(`ip:${ip}`);
     out.push({ type: "ip", value: ip, normalizedValue: ip, sourceEvidenceId, confidence: 0.8, privacyClass: "public" });
   }
