@@ -10,9 +10,11 @@ the frontend or committed.
 |---|---|---|---|---|
 | 0 | Local heuristics | **Implemented** | none (network-free) | renders when `THREAT_INTEL_ENABLED=true` |
 | 2 | Google Web Risk | **Implemented** | passive `GET v1/uris:search` (URL) | off |
-| 3 | VirusTotal | **Implemented** | passive `GET /api/v3/{urls,domains,ip_addresses,files}` | off |
-| 3 | AbuseIPDB | **Implemented** (check-only) | passive `GET /api/v2/check` (public IPv4) | off |
+| 3 | VirusTotal | **Implemented** | passive `GET /api/v3/{urls,domains,files}`; `ip_addresses` only when `THREAT_INTEL_VIRUSTOTAL_IP_ENABLED=true` | off (IP sub-lookup off) |
+| 3 | AbuseIPDB | **Implemented** (check-only) | passive `GET /api/v2/check` (public IPv4); **never** the report endpoint | off |
 | 3 | urlscan | **Planned (stub only)** | none yet | off |
+
+VirusTotal is the URL / domain / file-hash reputation provider. **AbuseIPDB is the default provider for public-IP reputation** (check-only); VirusTotal does **not** check IP indicators unless `THREAT_INTEL_VIRUSTOTAL_IP_ENABLED=true` is set explicitly.
 
 ## Feature flags & keys (server env)
 
@@ -22,9 +24,10 @@ the frontend or committed.
 | `THREAT_INTEL_EXTERNAL_LOOKUPS` | Gate for running any external provider at all. Default `false`. |
 | `THREAT_INTEL_PROVIDER_TIMEOUT_MS` | Per-provider timeout (default 4000). |
 | `THREAT_INTEL_WEB_RISK_ENABLED` + `GOOGLE_WEB_RISK_API_KEY` | Enable + configure Web Risk. |
-| `THREAT_INTEL_VIRUSTOTAL_ENABLED` + `VIRUSTOTAL_API_KEY` | Enable + configure VirusTotal. |
-| `THREAT_INTEL_ABUSEIPDB_ENABLED` + `ABUSEIPDB_API_KEY` | Planned. Flag/key reserved; not implemented. |
-| `THREAT_INTEL_URLSCAN_ENABLED` + `URLSCAN_API_KEY` | Planned. Flag/key reserved; not implemented. |
+| `THREAT_INTEL_VIRUSTOTAL_ENABLED` + `VIRUSTOTAL_API_KEY` | Enable + configure VirusTotal (URL / domain / file-hash reputation). |
+| `THREAT_INTEL_VIRUSTOTAL_IP_ENABLED` | Also let VirusTotal check IP indicators. **Default `false`** so AbuseIPDB is the default IP provider; url/domain/file-hash lookups are unaffected by this flag. |
+| `THREAT_INTEL_ABUSEIPDB_ENABLED` + `ABUSEIPDB_API_KEY` | Enable + configure AbuseIPDB. **Check-only** public-IP reputation via `GET /api/v2/check`; **never** calls the report endpoint (no automatic abuse reporting). Default IP reputation provider. |
+| `THREAT_INTEL_URLSCAN_ENABLED` + `URLSCAN_API_KEY` | Planned. Flag/key reserved; not implemented (stub only). |
 
 A provider is **enabled** only when its flag is the literal `true` **and** its key is present. Missing
 key ⇒ calm `Unavailable`/`Not checked` status, never an error to the user.
