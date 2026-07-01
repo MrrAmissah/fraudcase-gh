@@ -670,7 +670,8 @@ async function startServer() {
           },
         });
         gcsSuccess = true;
-        console.log(`Evidence stored in Cloud Storage: ${storagePath}`);
+        // Content-free: never log the object path (uid/caseId/filename); mode + route only.
+        logEvent({ event: "evidence_stored", route: "/api/cases/:id/evidence/upload", meta: { storageMode: "gcs" } });
       } catch (gcsErr: any) {
         logEvent({ event: "gcs_upload_failed", level: "warn", errorType: safeErrorType(gcsErr) });
       }
@@ -691,7 +692,8 @@ async function startServer() {
           fs.mkdirSync(localDir, { recursive: true });
           fs.writeFileSync(path.join(localDir, safeName), req.file.buffer);
           storageProvider = "local-dev";
-          console.warn(`[DEV-ONLY] Cloud Storage unavailable — evidence stored locally (provider=local-dev): ${storagePath}`);
+          // Content-free: signal the DEV-ONLY local fallback by mode, never the object path.
+          logEvent({ event: "evidence_stored", level: "warn", route: "/api/cases/:id/evidence/upload", meta: { storageMode: "local-dev" } });
         } catch (localErr: any) {
           logEvent({ event: "dev_local_storage_failed", level: "error", errorType: safeErrorType(localErr) });
           res.status(500).json({ error: "Could not store the evidence file." });
@@ -892,7 +894,8 @@ async function startServer() {
           const [exists] = await fileRef.exists();
           if (exists) {
             await fileRef.delete();
-            console.log(`Deleted ${targetItem.storagePath} from GCS`);
+            // Content-free: never log the object path (uid/caseId/filename); mode + route only.
+            logEvent({ event: "evidence_gcs_deleted", route: "/api/cases/:id/evidence/:evidenceId", meta: { storageMode: "gcs" } });
           }
         } catch (gcsDeleteErr) {
           logEvent({ event: "gcs_purge_failed", level: "warn", errorType: safeErrorType(gcsDeleteErr) });
