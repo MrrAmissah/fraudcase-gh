@@ -1571,7 +1571,9 @@ async function startServer() {
     // Serve build outputs in standard production container mode
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    // Express 5 (path-to-regexp v8) rejects the bare "*" string; use a named
+    // optional wildcard so the SPA fallback still matches every path, incl. "/".
+    app.get("/{*splat}", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
