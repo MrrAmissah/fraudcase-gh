@@ -1,6 +1,11 @@
-@import "tailwindcss";
-
+/* The font import MUST stay above `@import "tailwindcss"`. Tailwind's import is
+   expanded inline, so any @import after it ends up thousands of lines into the
+   generated stylesheet, where CSS forbids @import and postcss drops it. When
+   that happened, Inter never loaded and the whole UI silently fell back to a
+   system font. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@import "tailwindcss";
 
 /* Inter renders noticeably heavier than intended on macOS without this, which is
    the main reason the UI read as "thick". Grayscale antialiasing thins the stems
