@@ -1,4 +1,4 @@
-# FraudCase GH — Security & Privacy Overview
+# FraudCase GH, Security & Privacy Overview
 
 This document describes the security and privacy model of FraudCase GH, with references to the code that enforces each property. It reflects the current implementation (Cloud Storage and redaction are implemented, not future work).
 
@@ -26,14 +26,14 @@ Every protected endpoint requires a valid Firebase ID token.
 
 - The client sends `Authorization: Bearer <ID token>` on `/api/*` requests.
 - `requireAuth` rejects missing/malformed headers with `401`, then verifies the token with `adminAuth.verifyIdToken(token)` and attaches `{ uid, email }` to the request. Invalid/expired tokens return `401`.
-- The identity used for authorization comes **only** from the decoded token — never from request bodies or query params.
+- The identity used for authorization comes **only** from the decoded token, never from request bodies or query params.
 
 ## 3. `ownerId` isolation
 
 Ownership is re-checked on every case-scoped operation, not just at list time.
 
 - Read, report, evidence add/upload/download, analyze, update, and delete handlers all perform `if (caseData?.ownerId !== req.user.uid) → 403` before doing anything.
-- The update handler (`PUT`/`PATCH /api/cases/:id`) whitelists editable fields (`status`, `title`, `description`, `incidentDate`) and `updatedAt`. **`ownerId` is never read from the request body**, so ownership cannot be reassigned by a client.
+- The update handler (`PUT`/`PATCH /api/cases/:id`) whitelists editable fields (`status`, `title`, `description`, `incidentDate`) and `updatedAt`. **`ownerId` is never read from the request body**: so ownership cannot be reassigned by a client.
 - Uploaded files are namespaced per user: `users/{uid}/cases/{caseId}/evidence/{evidenceId}/{safeFileName}`, and the file-download endpoint re-verifies ownership before streaming bytes.
 
 ## 4. Redaction before AI
@@ -46,7 +46,7 @@ Detected and masked categories include:
 - **Phone** numbers (Ghana `+233` / `0[235]...` formats)
 - **Credit/debit card** number patterns
 - **Bank account** number patterns
-- **Secrets** — API keys, tokens, `client_secret`, passwords
+- **Secrets**: API keys, tokens, `client_secret`, passwords
 - **PIN / OTP / verification codes**
 
 The function returns the redacted text plus `redactionWarnings` and `detectedSensitiveTypes`, which the UI surfaces to the user ("sensitive data was masked before analysis"). For the public Quick Check, redaction runs **before** the call to `analyzeFraudCase`, and the raw input is never sent to the AI.
@@ -55,7 +55,7 @@ The function returns the redacted text plus `redactionWarnings` and `detectedSen
 
 The public Quick Check is ephemeral.
 
-- `POST /api/quick-check/analyze` redacts, analyzes, builds a result object, and returns it — **nothing is written to Firestore, Cloud Storage, or disk** (the handler explicitly constructs an in-memory `QuickCheckResult`).
+- `POST /api/quick-check/analyze` redacts, analyzes, builds a result object, and returns it, **nothing is written to Firestore, Cloud Storage, or disk** (the handler explicitly constructs an in-memory `QuickCheckResult`).
 - The flow is rate-limited to discourage abuse.
 - A result only becomes durable if the user explicitly chooses to **save it as a private case** (which requires authentication).
 
@@ -64,14 +64,14 @@ The public Quick Check is ephemeral.
 Contributing to pattern analysis is opt-in and minimal.
 
 - `POST /api/quick-check/submit-signal` is consent-gated in the UI and rate-limited.
-- It stores **only redacted/derived data** — no raw input text and no files. Even the admin-facing review note is treated as redacted; raw identifiers are not retained.
+- It stores **only redacted/derived data**: no raw input text and no files. Even the admin-facing review note is treated as redacted; raw identifiers are not retained.
 
 ## 7. Admin-only review (fail-closed)
 
 Only allowlisted admins can review community signals.
 
 - `requireAdmin` verifies the ID token **and** requires the email to be present in the `ADMIN_EMAILS` allowlist (case-insensitive). Authenticated-but-not-admin users receive `403`.
-- It is **fail-closed**: if `ADMIN_EMAILS` is empty or unset, `getAdminEmails()` is empty and *no one* is an admin — the admin dashboard is inaccessible to everyone.
+- It is **fail-closed**: if `ADMIN_EMAILS` is empty or unset, `getAdminEmails()` is empty and *no one* is an admin, the admin dashboard is inaccessible to everyone.
 - `GET /api/admin/me` is a capability probe so the client can hide the admin link from non-admins without leaking data.
 
 ## 8. No public scammer directory
@@ -79,7 +79,7 @@ Only allowlisted admins can review community signals.
 There is intentionally no public exposure of people, cases, or signals.
 
 - No unauthenticated endpoint lists cases, signals, or identities.
-- Community signals are visible only to admins, for pattern review — not published.
+- Community signals are visible only to admins, for pattern review, not published.
 - The product supports no "wall of shame", search index, or open dox list.
 
 ## 9. No legal guilt declarations
@@ -87,7 +87,7 @@ There is intentionally no public exposure of people, cases, or signals.
 The system is designed to avoid defamation and harm.
 
 - The Gemini system instruction and prompt forbid declaring guilt or framing anyone as a confirmed criminal; outputs use cautious language ("possible indicators", "risk signals").
-- The response schema requires a **disclaimer**, and the report/UI restate that the analysis is decision-support — not legal advice and not a law-enforcement determination.
+- The response schema requires a **disclaimer**: and the report/UI restate that the analysis is decision-support, not legal advice and not a law-enforcement determination.
 - Entity extraction is **grounded in the evidence** (empty when absent) so the tool does not invent identifying details about anyone; the heuristic fallback follows the same non-fabrication rule.
 
 ---
@@ -107,7 +107,7 @@ The system is designed to avoid defamation and harm.
 
 The three no-auth Quick Check endpoints (`analyze`, `analyze-file`, `submit-signal`) have layered, in-app abuse controls. They reduce casual scripted abuse but are **best-effort, not abuse-proof**.
 
-- **Request size.** Public text endpoints reject bodies over **1MB** early via `Content-Length` (the analysis itself only uses the first 5000 characters). Public file uploads stay capped at **5MB**, single file, in-memory, never stored.
+- **Request size.** Public text endpoints reject bodies over **1MB** early via `Content-Length` (the analysis itself only uses the first 5000 characters). Public file uploads stay capped at **5MB**: single file, in-memory, never stored.
 - **Client IP.** The limiters key on a `getClientIp(req)` helper that trusts `X-Forwarded-For` **only** when `TRUST_PROXY=true` (running behind a known proxy). By default the header is ignored and the socket address is used, so a script cannot rotate fake `X-Forwarded-For` values to dodge limits in local/dev.
 - **Daily caps.** ~15 analyze and 10 signal submissions per client per day.
 - **Short-window burst caps.** analyze 5 per 5 min, file analyze 3 per 5 min, signal 5 per 10 min. Exceeding any returns a calm `429`.
@@ -127,11 +127,11 @@ We do not claim the public endpoint is abuse-proof.
 
 ## Known limitations & honest caveats
 
-- **Server-side enforcement is the primary control.** Firestore/Storage **security rules** as defense-in-depth are not yet in the repo (roadmap). A misconfigured client SDK alone should not be relied on for authorization — the server checks are what enforce isolation.
+- **Server-side enforcement is the primary control.** Firestore/Storage **security rules** as defense-in-depth are not yet in the repo (roadmap). A misconfigured client SDK alone should not be relied on for authorization, the server checks are what enforce isolation.
 - **Public anti-abuse is best-effort.** The in-app rate and size limits on the no-auth Quick Check endpoints reduce casual scripted abuse but are in-memory and bypassable behind spoofed proxies. Production controls (App Check, CAPTCHA, WAF, billing alerts) are required; see "Public endpoint abuse controls" above.
 - **Dev-only local storage fallback.** When Cloud Storage credentials are absent, evidence is written to a local directory marked `provider=local-dev`. This is for development only and is clearly logged.
 - **Redaction is pattern-based.** `redactPIIAndSecrets` uses regex heuristics; it covers common Ghanaian PII/secret formats but is not a guarantee against every possible sensitive string. Users are also prompted to avoid pasting raw credentials.
-- **Heuristic fallback is conservative, not clever.** When Gemini is unavailable, categorization is keyword-based — intentionally non-fabricating, but coarser than the model.
+- **Heuristic fallback is conservative, not clever.** When Gemini is unavailable, categorization is keyword-based, intentionally non-fabricating, but coarser than the model.
 
 ---
 

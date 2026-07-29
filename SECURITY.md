@@ -1,6 +1,6 @@
 # FraudCase GH - Evidentiary System Security & Architecture Guidelines
 
-This document outlines the security, privacy, and architectural guidelines implemented in the MVP of **FraudCase GH**, along with detailed roadmaps for future production development in VS Code.
+This document outlines the security, privacy, and architectural guidelines implemented in the MVP of **FraudCase GH**: along with detailed roadmaps for future production development in VS Code.
 
 ---
 

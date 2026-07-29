@@ -1,6 +1,6 @@
 # Vercel frontend deployment
 
-**Architecture (Option A′):** Vercel hosts the static SPA (Vite build) and **rewrites `/api/*` to the Cloud Run backend** (`fraudcase-prod`). The browser stays same-origin to Vercel, so no CORS and no client code change; Vercel proxies API calls to Cloud Run, which is publicly invocable but **enforces its own Firebase auth on every route** (the app is the gatekeeper). Gemini runs server-side on Cloud Run via Vertex AI — never in the browser.
+**Architecture (Option A′):** Vercel hosts the static SPA (Vite build) and **rewrites `/api/*` to the Cloud Run backend** (`fraudcase-prod`). The browser stays same-origin to Vercel, so no CORS and no client code change; Vercel proxies API calls to Cloud Run, which is publicly invocable but **enforces its own Firebase auth on every route** (the app is the gatekeeper). Gemini runs server-side on Cloud Run via Vertex AI, never in the browser.
 
 ```
 Browser ──(/api/*, Authorization: Firebase ID token)──► Vercel (static SPA + rewrite)
