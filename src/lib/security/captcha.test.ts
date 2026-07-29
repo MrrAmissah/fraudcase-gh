@@ -22,7 +22,7 @@ function mockReq(headers: Record<string, string> = {}) {
   return { header: (n: string) => headers[n] };
 }
 
-test("passthrough when not enforced (default off) — never calls verifier", async () => {
+test("passthrough when not enforced (default off), never calls verifier", async () => {
   const mw = createCaptchaMiddleware({
     isEnforced: () => false,
     verifier: async () => {

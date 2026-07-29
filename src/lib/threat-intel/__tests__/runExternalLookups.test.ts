@@ -11,7 +11,7 @@ function ind(
 ): ExtractedIndicator {
   return { type, value, normalizedValue: value, confidence: 0.9, privacyClass, domain: type === "url" || type === "domain" ? value : undefined };
 }
-// fetch that throws — proves the path never reaches the network in tests.
+// fetch that throws, proves the path never reaches the network in tests.
 const noNetworkFetch = (async () => {
   throw new Error("no network in tests");
 }) as unknown as typeof fetch;

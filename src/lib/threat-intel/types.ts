@@ -2,7 +2,7 @@
  * Threat-intelligence enrichment types (see docs/THREAT_INTEL_ENRICHMENT_PLAN.md).
  *
  * Non-negotiable wording: external lookups produce "external reputation signals" / "possible match" /
- * "needs verification" — never "confirmed fraud/scam" and never an accusation of a person. A no-match
+ * "needs verification", never "confirmed fraud/scam" and never an accusation of a person. A no-match
  * means "not found in this source", never "safe".
  */
 

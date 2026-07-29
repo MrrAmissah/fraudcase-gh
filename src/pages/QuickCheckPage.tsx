@@ -42,7 +42,7 @@ export default function QuickCheckPage({
   };
 
   // Public file upload (readable text only). The server validates, redacts, and analyzes the text
-  // ephemerally — nothing anonymous is stored. Images/PDFs come back as guidance, shown as `error`.
+  // ephemerally, nothing anonymous is stored. Images/PDFs come back as guidance, shown as `error`.
   const handleAnalyzeFile = async (file: File) => {
     setIsLoading(true);
     setError(null);

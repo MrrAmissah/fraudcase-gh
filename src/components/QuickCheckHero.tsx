@@ -3,7 +3,7 @@ import { ShieldCheck, Zap, Lock } from "lucide-react";
 
 /**
  * Compact hero for the public Quick Check page. Deliberately simpler than the private
- * workspace — fast input → result, with a visible privacy note.
+ * workspace, fast input → result, with a visible privacy note.
  */
 export default function QuickCheckHero() {
   return (

@@ -58,7 +58,7 @@ export default function QuickCheckResultCard({
 
   const handleCopy = async () => {
     const summary = [
-      `FraudCase GH — Quick Check result`,
+      `FraudCase GH: Quick Check result`,
       `Possible category: ${getScamCategoryLabel(result.scamCategory)}`,
       `Risk signal: ${risk.label} (${result.riskScore}/100, ${result.confidence} confidence)`,
       ``,
@@ -78,7 +78,7 @@ export default function QuickCheckResultCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard unavailable — no-op */
+      /* clipboard unavailable, no-op */
     }
   };
 

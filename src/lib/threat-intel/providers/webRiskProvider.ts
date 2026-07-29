@@ -3,7 +3,7 @@
  *
  * Uses the read-only `v1/uris:search` endpoint (a lookup, never a submission). Only accepted URL
  * indicators reach here (the dispatcher skips `do_not_send_external`). An empty response means the
- * URL was not on the requested lists — NOT that it is safe. No raw evidence, files, or PII are sent.
+ * URL was not on the requested lists, NOT that it is safe. No raw evidence, files, or PII are sent.
  */
 import { ProviderVerdict, VerdictCategory } from "../types";
 import {

@@ -18,7 +18,7 @@ const IMAGE_PDF_GUIDANCE =
 /**
  * Public input panel: paste suspicious message text or a URL. Shows a live redaction
  * preview (the same guard the server applies before analysis) so the user can see what
- * gets masked. Redaction is always applied before analysis — it cannot be turned off.
+ * gets masked. Redaction is always applied before analysis, it cannot be turned off.
  */
 export default function QuickCheckInputPanel({ onAnalyze, onAnalyzeFile, isLoading = false, error }: QuickCheckInputPanelProps) {
   const [text, setText] = useState("");

@@ -6,14 +6,14 @@
  *    `extractionRuns` audit docs survive as orphans.
  *  - The case's evidence files live in Cloud Storage (and a DEV-ONLY local backup), which the doc
  *    delete never touches.
- * Both leak after a "delete" — a data-retention/privacy and storage-cost problem for sensitive
+ * Both leak after a "delete", a data-retention/privacy and storage-cost problem for sensitive
  * fraud evidence. This helper purges those resources, then deletes the doc.
  *
  * Semantics: each storage/subcollection purge is BEST-EFFORT and isolated, so a transient failure is
  * logged (ops' only orphan signal) but never blocks the authoritative case-doc deletion. A transient
  * GCS error therefore still returns success with the doc gone, by design.
  *
- * Ownership MUST be verified by the caller before invoking this — the prefix delete is destructive
+ * Ownership MUST be verified by the caller before invoking this, the prefix delete is destructive
  * and unconditional.
  */
 import path from "node:path";
@@ -23,7 +23,7 @@ export type CascadePurgeEvent = "gcs_purge_failed" | "local_purge_failed" | "ext
 export interface CascadeDeleteCaseDeps {
   /**
    * The RAW auth uid. MUST be the same uid evidence `storagePath`s are keyed under (the upload route
-   * builds them from `req.user.uid`, not a resolved owner id) — otherwise the prefix matches nothing
+   * builds them from `req.user.uid`, not a resolved owner id), otherwise the prefix matches nothing
    * and everything is silently re-orphaned.
    */
   uid: string;
@@ -43,7 +43,7 @@ export interface CascadeDeleteCaseDeps {
 }
 
 export async function cascadeDeleteCase(deps: CascadeDeleteCaseDeps): Promise<void> {
-  // 1. Cloud Storage: the case's isolated evidence folder. The trailing slash is load-bearing —
+  // 1. Cloud Storage: the case's isolated evidence folder. The trailing slash is load-bearing,
   //    without it the prefix would also match sibling cases (e.g. `case-12` vs `case-120`). Built as a
   //    literal (GCS object names always use "/"), never via path.join.
   try {
@@ -59,13 +59,13 @@ export async function cascadeDeleteCase(deps: CascadeDeleteCaseDeps): Promise<vo
     deps.onPurgeError("local_purge_failed", err);
   }
 
-  // 3. `extractionRuns` audit subcollection — Firestore does not cascade subcollections on doc delete.
+  // 3. `extractionRuns` audit subcollection, Firestore does not cascade subcollections on doc delete.
   try {
     await deps.purgeExtractionRuns();
   } catch (err) {
     deps.onPurgeError("extraction_runs_purge_failed", err);
   }
 
-  // 4. The case document itself — authoritative; runs even if a best-effort purge above failed.
+  // 4. The case document itself, authoritative; runs even if a best-effort purge above failed.
   await deps.deleteCaseDoc();
 }

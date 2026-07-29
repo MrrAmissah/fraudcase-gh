@@ -93,7 +93,7 @@ function AppContent() {
     await addEvidence(created.id, {
       type: "note",
       title: "Imported from Quick Check",
-      originalText: result.redactedText, // already redacted/masked — no raw input
+      originalText: result.redactedText, // already redacted/masked, no raw input
     });
     return analyzeCase(created.id);
   };
@@ -327,7 +327,7 @@ function AppContent() {
 
   // Intercept views when user is not authenticated, shielding case folders
   const handleNavigate = (view: any) => {
-    // Public views — available without authentication.
+    // Public views, available without authentication.
     if (view === "landing" || view === "quick_check") {
       setActiveView(view);
       return;
@@ -352,7 +352,7 @@ function AppContent() {
       );
     }
 
-    // Public Quick Check — intentionally available without authentication.
+    // Public Quick Check, intentionally available without authentication.
     if (activeView === "quick_check") {
       return (
         <QuickCheckPage

@@ -34,7 +34,7 @@ export function buildAnalysisInputBundle(
       items.push({
         evidenceId: item.id,
         sourceType: artifact.sourceType,
-        // Inspection metadata only — NOT analysis input. Analysis consumes accepted facts (see
+        // Inspection metadata only, NOT analysis input. Analysis consumes accepted facts (see
         // bundleToAnalysisEvidenceItems / acceptedFactsText), so unaccepted OCR never reaches pass B.
         redactedText: acceptedFacts.length > 0 ? artifact.redactedText : undefined,
         acceptedFacts,
@@ -62,7 +62,7 @@ export function buildAnalysisInputBundle(
 }
 
 /**
- * Text built from ONLY user-accepted facts' redacted values — the safe input for threat-intel
+ * Text built from ONLY user-accepted facts' redacted values, the safe input for threat-intel
  * enrichment. Deliberately excludes `redactedText` (which contains unaccepted artifact text), so
  * indicators are never extracted from suggestions/rejected content.
  */
@@ -84,7 +84,7 @@ export function bundleToAnalysisEvidenceItems(bundle: AnalysisInputBundle): Evid
   return bundle.items
     .filter((it) => it.acceptedFacts.length > 0)
     .map((it) => {
-      // Accepted facts ONLY — never the full artifact transcript. Including `redactedText` would leak
+      // Accepted facts ONLY, never the full artifact transcript. Including `redactedText` would leak
       // unaccepted OCR (unsupported claims, embedded "ignore instructions" text) into pass B, breaking
       // the Decision 2 no-auto-trust gate. Only user-accepted facts feed analysis.
       const lines = it.acceptedFacts.map((f) => `${f.type}: ${f.redactedValue}`).filter((l) => l.trim());

@@ -13,8 +13,8 @@ import path from "path";
 
 export type FileKind = "png" | "jpeg" | "webp" | "pdf" | "text" | "unknown";
 
-// Strict MVP allowlist. Anything not listed — js, sh, py, exe, bat, cmd, php, jar,
-// macro-enabled Office files, and unknown binaries — is rejected by omission.
+// Strict MVP allowlist. Anything not listed, js, sh, py, exe, bat, cmd, php, jar,
+// macro-enabled Office files, and unknown binaries, is rejected by omission.
 export const ALLOWED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".pdf", ".txt", ".csv", ".json", ".html"];
 
 export const ALLOWED_MIME_TYPES = [

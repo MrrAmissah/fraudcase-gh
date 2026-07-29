@@ -130,7 +130,7 @@ export default function EvidencePipeline() {
         {/* Column headings are real section copy and stay in the accessibility
             tree; only the sample panels are decorative. */}
         <div className="grid lg:grid-cols-3 gap-5 items-start">
-          {/* 01 — Collect */}
+          {/* Step 01: Collect */}
           <motion.div variants={item}>
             <ColumnHeader
               n="01"
@@ -184,7 +184,7 @@ export default function EvidencePipeline() {
             </Panel>
           </motion.div>
 
-          {/* 02 — Verify */}
+          {/* Step 02: Verify */}
           <motion.div variants={item}>
             <ColumnHeader
               n="02"
@@ -228,7 +228,7 @@ export default function EvidencePipeline() {
             </Panel>
           </motion.div>
 
-          {/* 03 — Report */}
+          {/* Step 03: Report */}
           <motion.div variants={item}>
             <ColumnHeader
               n="03"

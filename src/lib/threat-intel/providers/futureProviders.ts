@@ -1,5 +1,5 @@
 /**
- * Placeholder provider(s) — declared but NOT implemented; permanently disabled (no flag, no key, no
+ * Placeholder provider(s), declared but NOT implemented; permanently disabled (no flag, no key, no
  * network) until separately approved with a passive-only design.
  *
  *  - urlscan: search EXISTING public scans only; never AUTO-SUBMIT user-derived URLs.

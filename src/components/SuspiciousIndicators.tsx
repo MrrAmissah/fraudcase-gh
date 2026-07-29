@@ -9,7 +9,7 @@ interface SuspiciousIndicatorsProps {
 export default function SuspiciousIndicators({ indicators }: SuspiciousIndicatorsProps) {
   const getSeverityAndDetails = (text: string) => {
     const norm = text.toLowerCase();
-    // Shared classifier (src/lib/utils/indicatorSeverity) — never defaults unmatched indicators to
+    // Shared classifier (src/lib/utils/indicatorSeverity), never defaults unmatched indicators to
     // "Low", so real fraud signals that lack high-risk trigger words are not understated. The
     // analysis visual summary's severity bars use the same classifier so the two never diverge.
     const severity = classifyIndicatorSeverity(text);

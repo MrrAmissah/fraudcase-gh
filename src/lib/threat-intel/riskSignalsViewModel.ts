@@ -95,7 +95,7 @@ export function buildRiskSignalsViewModel(
           severity: "info",
           confidence: s.indicator.confidence,
           safeDisplayValue: s.indicator.value,
-          explanation: "Contains tokens or personal data — checked locally only; never sent to external providers.",
+          explanation: "Contains tokens or personal data, checked locally only; never sent to external providers.",
         });
       }
     }

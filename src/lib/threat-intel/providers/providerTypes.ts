@@ -17,7 +17,7 @@ export interface ProviderCapabilities {
 }
 
 export interface ProviderLookupContext {
-  /** Injected fetch — tests pass a mock; nothing reaches the network unmocked. */
+  /** Injected fetch, tests pass a mock; nothing reaches the network unmocked. */
   fetchImpl: typeof fetch;
   timeoutMs: number;
   env: NodeJS.ProcessEnv;

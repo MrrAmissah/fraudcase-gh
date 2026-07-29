@@ -173,7 +173,7 @@ export default function AppShell({
               </div>
             </div>
 
-            {/* Product navigation — only destinations that exist */}
+            {/* Product navigation, only destinations that exist */}
             <div>
               <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-slate-400 mb-4">
                 Product

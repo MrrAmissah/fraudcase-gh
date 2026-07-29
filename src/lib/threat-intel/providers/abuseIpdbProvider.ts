@@ -34,7 +34,7 @@ async function lookup(kind: LookupKind, value: string, ctx: ProviderLookupContex
     const url = new URL(CHECK_ENDPOINT);
     url.searchParams.set("ipAddress", value);
     url.searchParams.set("maxAgeInDays", "90");
-    // GET check only — the report endpoint is never used.
+    // GET check only, the report endpoint is never used.
     const res = await ctx.fetchImpl(url.toString(), { method: "GET", headers: { Key: key, Accept: "application/json" } });
     if (!res.ok) return errorVerdict("abuseipdb", new Error(`HTTP ${res.status}`), now);
 

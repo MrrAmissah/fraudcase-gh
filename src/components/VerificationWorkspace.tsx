@@ -213,7 +213,7 @@ export default function VerificationWorkspace({ caseId, evidence, onClose, onVer
                         <p className="text-[11px] text-slate-500 font-sans italic border-l-2 border-slate-150 pl-2">"{fact.evidenceQuote}"</p>
                       )}
 
-                      {/* Subordinate AI signals — clearly not a trust verdict. */}
+                      {/* Subordinate AI signals, clearly not a trust verdict. */}
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] text-slate-400 font-sans">
                         <span>{factGroundingLabel(fact.verification)}</span>
                         <span>{factConfidenceLabel(fact.confidence)}</span>

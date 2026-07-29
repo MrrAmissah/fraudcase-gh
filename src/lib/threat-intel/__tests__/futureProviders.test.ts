@@ -4,7 +4,7 @@ import { urlscanProviderStub } from "../providers/futureProviders";
 import { ProviderLookupContext } from "../providers/providerTypes";
 
 const noNetworkFetch = (async () => {
-  throw new Error("no network — stub must not call out");
+  throw new Error("no network, stub must not call out");
 }) as unknown as typeof fetch;
 const ctx: ProviderLookupContext = { fetchImpl: noNetworkFetch, timeoutMs: 1000, env: {} as NodeJS.ProcessEnv };
 const anyEnv = (o: Record<string, string>) => o as unknown as NodeJS.ProcessEnv;
