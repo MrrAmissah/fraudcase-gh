@@ -44,10 +44,14 @@ test("resolveFirestoreDatabaseId: empty/whitespace never silently becomes (defau
   assert.notEqual(resolveFirestoreDatabaseId({ FIRESTORE_DATABASE_ID: "" } as unknown as NodeJS.ProcessEnv), "(default)");
 });
 
-test("resolveGeminiModel: defaults to a stable GA model, not the unreliable gemini-3.5-flash", () => {
+test("resolveGeminiModel: defaults to a GA model that is not on the Vertex deprecation list", () => {
   assert.equal(resolveGeminiModel({} as NodeJS.ProcessEnv), DEFAULT_GEMINI_MODEL);
-  assert.equal(DEFAULT_GEMINI_MODEL, "gemini-2.5-flash");
-  assert.notEqual(DEFAULT_GEMINI_MODEL, "gemini-3.5-flash");
+  assert.equal(DEFAULT_GEMINI_MODEL, "gemini-3.1-flash-lite");
+
+  // Discontinued on Vertex from 2026-10-20; none of these may become the default again.
+  for (const deprecated of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]) {
+    assert.notEqual(DEFAULT_GEMINI_MODEL, deprecated);
+  }
 });
 
 test("resolveGeminiModel: honors the GEMINI_MODEL override (applies to analyzer + extractor alike)", () => {

@@ -35,11 +35,25 @@ export function resolveFirestoreDatabaseId(env: NodeJS.ProcessEnv = process.env)
 }
 
 /**
- * Default Gemini model id. `gemini-2.5-flash` is a stable, generally-available multimodal model.
- * The previously hardcoded `gemini-3.5-flash` returned `ApiError:503` (not reliably serving) during
- * the staging smoke test, so it is no longer the default.
+ * Default Gemini model id.
+ *
+ * `gemini-2.5-flash` is deprecated on Vertex from 2026-10-20 (Extended Lifecycle Access), with a
+ * significant price rise from 2027-01-28, so the default moved to a recommended GA successor.
+ *
+ * `gemini-3.1-flash-lite` was chosen by measuring all the recommended targets against the real
+ * {@link fraudCaseSchema} on Vertex, two runs each (latency / risk score):
+ *
+ *   gemini-2.5-flash       17.1-18.3s   85-90   <- previous default, exceeded the 15s timeout
+ *   gemini-3.5-flash       15.1s        85
+ *   gemini-3.6-flash        7.3s        88
+ *   gemini-3.5-flash-lite   3.1-4.3s    85
+ *   gemini-3.1-flash-lite   3.9-4.2s    90      <- chosen
+ *
+ * All produced schema-valid output and agreed on category and confidence. The lite tier is also
+ * what the deprecation notice recommends for cost. Note the old default was running 17-18s against
+ * a 15s timeout, so real analyses were likely degrading to the heuristic before this change.
  */
-export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
 
 /**
  * Resolve the Gemini model id, honoring the `GEMINI_MODEL` override and falling back to the stable
@@ -51,8 +65,18 @@ export function resolveGeminiModel(env: NodeJS.ProcessEnv = process.env): string
   return raw || DEFAULT_GEMINI_MODEL;
 }
 
-/** Default Vertex AI region used when GOOGLE_CLOUD_LOCATION is unset. */
-export const DEFAULT_VERTEX_LOCATION = "us-central1";
+/**
+ * Default Vertex AI location used when GOOGLE_CLOUD_LOCATION is unset.
+ *
+ * Must be `global` for the Gemini 3.x family. Measured against this project: every 3.x candidate
+ * (3.5-flash, 3.5-flash-lite, 3.1-flash-lite, 3.6-flash) returns `ApiError:404` in `us-central1`
+ * but serves correctly from `global`. `gemini-2.5-flash` serves from both, so this is safe to
+ * change independently of the model.
+ *
+ * The 404 is the dangerous failure here: the analyzer catches it and falls back to the heuristic,
+ * so a region mismatch degrades analysis quality silently rather than erroring loudly.
+ */
+export const DEFAULT_VERTEX_LOCATION = "global";
 
 export interface ResolvedGenAIConfig {
   vertexai: boolean;
