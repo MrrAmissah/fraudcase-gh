@@ -188,7 +188,7 @@ export default function CaseDetailPage({
 
             <button
               onClick={handleOpenAddEvidence}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all flex items-center gap-1.5"
               id="add-evidence-shortcut-btn"
             >
               <Plus size={13} className="text-slate-500" />
@@ -198,7 +198,7 @@ export default function CaseDetailPage({
             <button
               onClick={handleAnalyzeLocal}
               disabled={isAnalyzing || evidenceItems.length === 0}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 disabled:bg-slate-50 disabled:border-slate-150 disabled:text-slate-405 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 disabled:bg-slate-50 disabled:border-slate-150 disabled:text-slate-405 border border-slate-200 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all flex items-center gap-1.5"
               id="reanalyze-shortcut-btn"
             >
               <RefreshCw size={13} className={`text-slate-500 ${isAnalyzing ? "animate-spin" : ""}`} />
@@ -236,7 +236,7 @@ export default function CaseDetailPage({
 
       {/* 2b. Stale-analysis nudge: accepted/rejected facts only affect analysis after a re-run. */}
       {hasAnalysis && analysisStale && (
-        <div className="bg-amber-50/70 border border-amber-150 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print" id="analysis-stale-banner">
+        <div className="bg-amber-50/70 border border-amber-100 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print" id="analysis-stale-banner">
           <div className="flex items-start gap-2">
             <AlertCircle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
             <p className="text-[12.5px] text-amber-900 font-sans leading-snug">
@@ -381,7 +381,7 @@ export default function CaseDetailPage({
               }`}
             >
               <div className="bg-slate-50/60 p-3.5 border border-slate-200 rounded-xl space-y-3">
-                <h4 className="text-[13px] font-semibold text-slate-850 font-sans">
+                <h4 className="text-[13px] font-semibold text-slate-800 font-sans">
                   Attach New Evidence
                 </h4>
                 <EvidenceInput 
@@ -500,7 +500,7 @@ export default function CaseDetailPage({
       {hasAnalysis && (
         <div className="p-6 bg-cyan-50/40 border border-cyan-100 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 mt-8" id="report-cta-bottom-panel text-left">
           <div className="space-y-1 text-center md:text-left">
-            <h3 className="text-[15px] font-semibold text-slate-850 font-sans tracking-tight">
+            <h3 className="text-[15px] font-semibold text-slate-800 font-sans tracking-tight">
               Ready to prepare a case report?
             </h3>
             <p className="text-[13px] text-slate-500 font-sans font-normal leading-normal">

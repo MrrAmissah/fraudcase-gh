@@ -325,7 +325,7 @@ export default function EvidenceInput({ onAddEvidence, isLoading = false }: Evid
                   </div>
                   <div className="space-y-0.5">
                     <p className="font-semibold text-slate-800 truncate max-w-[220px]">{uploadedFile.name}</p>
-                    <div className="flex items-center gap-2 text-[10.5px] text-slate-450">
+                    <div className="flex items-center gap-2 text-[10.5px] text-slate-400">
                       <span className="font-medium bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-sans uppercase">
                         {uploadedFile.name.split(".").pop()?.toUpperCase()}
                       </span>
@@ -350,7 +350,7 @@ export default function EvidenceInput({ onAddEvidence, isLoading = false }: Evid
                 <p className="font-semibold text-[11px] text-slate-600 tracking-normal uppercase">
                   Drag & drop your file here
                 </p>
-                <p className="text-slate-450 font-normal text-[11px]">
+                <p className="text-slate-400 font-normal text-[11px]">
                   Supports PNG, JPG, WebP, PDF, TXT, CSV, JSON, HTML up to 10MB
                 </p>
               </div>
@@ -432,7 +432,7 @@ export default function EvidenceInput({ onAddEvidence, isLoading = false }: Evid
             
             {isRedactingLocal && (
               <div className="p-2 bg-white border border-slate-200 rounded text-[10px] text-cyan-850 font-mono overflow-x-auto whitespace-pre-wrap max-h-32">
-                <span className="text-slate-450 font-semibold block border-b border-slate-100 pb-1 mb-1 font-sans">
+                <span className="text-slate-400 font-semibold block border-b border-slate-100 pb-1 mb-1 font-sans">
                   Redacted Sanitization Preview Output
                 </span>
                 {redactPIIAndSecrets(originalText).redactedText || "(No payload extracted)"}

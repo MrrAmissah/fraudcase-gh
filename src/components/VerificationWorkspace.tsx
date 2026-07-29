@@ -122,8 +122,8 @@ export default function VerificationWorkspace({ caseId, evidence, onClose, onVer
           <div className="flex items-center gap-2">
             {isImage ? <ImageIcon size={16} className="text-indigo-500" /> : <FileText size={16} className="text-indigo-500" />}
             <div>
-              <h3 className="text-[14px] font-semibold text-slate-850 font-sans tracking-tight">Verify extracted evidence</h3>
-              <p className="text-[11px] text-slate-450 font-sans">{evidence.title}</p>
+              <h3 className="text-[14px] font-semibold text-slate-800 font-sans tracking-tight">Verify extracted evidence</h3>
+              <p className="text-[11px] text-slate-400 font-sans">{evidence.title}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer" title="Close" id="verify-close-btn">

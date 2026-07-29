@@ -38,7 +38,7 @@ export default function ExtractedEntitiesTable({ entities }: ExtractedEntitiesTa
       id: "ent-amounts",
       label: "Monetary requests",
       items: amounts || [],
-      tagColor: "bg-amber-50/50 border-amber-150 text-amber-800 font-mono",
+      tagColor: "bg-amber-50/50 border-amber-100 text-amber-800 font-mono",
     },
     {
       id: "ent-dates",

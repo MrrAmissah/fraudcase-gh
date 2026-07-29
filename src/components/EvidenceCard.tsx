@@ -79,7 +79,7 @@ export default function EvidenceCard({ evidence, onRemove, onExtract, onOpenVeri
   const getEvidenceIcon = (t: EvidenceType) => {
     switch (t) {
       case "sms":
-        return <MessageSquare size={16} className="text-blue-600" />;
+        return <MessageSquare size={16} className="text-indigo-600" />;
       case "whatsapp":
         return <MessageSquare size={16} className="text-emerald-600" />;
       case "url":
@@ -197,10 +197,10 @@ export default function EvidenceCard({ evidence, onRemove, onExtract, onOpenVeri
             {getEvidenceIcon(type)}
           </div>
           <div>
-            <h4 className="text-[13.5px] font-semibold text-slate-850 tracking-tight leading-normal">
+            <h4 className="text-[13.5px] font-semibold text-slate-800 tracking-tight leading-normal">
               {title}
             </h4>
-            <div className="text-[11px] font-sans text-slate-450 mt-0.5 inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <div className="text-[11px] font-sans text-slate-400 mt-0.5 inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <span className="font-medium text-slate-650">{getTypeNameStr(type)}</span>
               <span>&bull;</span>
               <span className="font-mono bg-slate-50 border border-slate-100 rounded px-1 text-[10px]">
@@ -233,7 +233,7 @@ export default function EvidenceCard({ evidence, onRemove, onExtract, onOpenVeri
               <p className="font-semibold text-slate-800 truncate" title={fileName}>
                 {fileName}
               </p>
-              <p className="text-[10.5px] text-slate-450">
+              <p className="text-[10.5px] text-slate-400">
                 {formatBytes(fileSize)}
               </p>
             </div>

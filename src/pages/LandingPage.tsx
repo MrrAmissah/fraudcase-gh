@@ -1,5 +1,11 @@
 import React from "react";
-import LandingHero from "../components/LandingHero";
+import HeroSection from "../components/landing/HeroSection";
+import TrustStrip from "../components/landing/TrustStrip";
+import HowItWorks from "../components/landing/HowItWorks";
+import EvidencePipeline from "../components/landing/EvidencePipeline";
+import TrustBand from "../components/landing/TrustBand";
+import CtaBand from "../components/landing/CtaBand";
+import ComplianceNotice from "../components/landing/ComplianceNotice";
 
 interface LandingPageProps {
   onStart: () => void;
@@ -8,8 +14,20 @@ interface LandingPageProps {
 
 export default function LandingPage({ onStart, onQuickCheck }: LandingPageProps) {
   return (
-    <div className="flex flex-col justify-start w-full" id="landing-page">
-      <LandingHero onGetStarted={onStart} onQuickCheck={onQuickCheck} />
+    <div className="w-full" id="landing-page">
+      <HeroSection onGetStarted={onStart} onQuickCheck={onQuickCheck} />
+
+      {/* Everything below the hero shares one rhythm on the tinted canvas. */}
+      <div className="bg-canvas border-t border-slate-100">
+        <div className="space-y-20 lg:space-y-24 py-16 lg:py-20">
+          <TrustStrip />
+          <HowItWorks />
+          <EvidencePipeline />
+          <TrustBand />
+          <CtaBand onGetStarted={onStart} onQuickCheck={onQuickCheck} />
+          <ComplianceNotice />
+        </div>
+      </div>
     </div>
   );
 }

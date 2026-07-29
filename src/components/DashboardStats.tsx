@@ -18,7 +18,7 @@ export default function DashboardStats({ cases }: DashboardStatsProps) {
       title: "Total Cases Registered",
       value: total,
       icon: <FolderKanban size={20} />,
-      color: "text-blue-600 border-blue-200 bg-blue-50/50",
+      color: "text-indigo-600 border-indigo-200 bg-indigo-50/50",
     },
     {
       id: "stat-draft",

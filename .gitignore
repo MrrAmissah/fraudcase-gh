@@ -19,3 +19,6 @@ firebase-adminsdk*.json
 # Local-only AI/operator handoff + scratch notes (never committed)
 .ai-local/
 .vercel
+
+# Local redesign reference images (not part of the app)
+redesign-ref/
