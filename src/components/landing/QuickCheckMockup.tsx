@@ -6,9 +6,7 @@ import {
   FileText,
   Download,
   ShieldCheck,
-  Lock,
   FileSpreadsheet,
-  BadgeCheck,
 } from "lucide-react";
 import RiskGauge from "../analysis/RiskGauge";
 
@@ -79,7 +77,7 @@ export default function QuickCheckMockup() {
               </div>
               <div className="space-y-1.5 min-w-0">
                 <div className="text-[11px] text-slate-500">Possible category</div>
-                <div className="text-[14px] font-semibold text-slate-900 leading-snug">
+                <div className="text-[14px] font-medium text-slate-900 leading-snug">
                   Fake delivery / courier fee
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -95,7 +93,7 @@ export default function QuickCheckMockup() {
 
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="border border-slate-200 rounded-lg p-3 space-y-2">
-                <div className="text-[10.5px] font-semibold text-slate-700">Top risk indicators</div>
+                <div className="text-[10.5px] font-medium text-slate-700">Top risk indicators</div>
                 {INDICATORS.map((ind) => (
                   <div key={ind.label} className="flex items-center justify-between gap-2">
                     <span className="text-[10.5px] text-slate-600 truncate">{ind.label}</span>
@@ -111,7 +109,7 @@ export default function QuickCheckMockup() {
               </div>
 
               <div className="border border-slate-200 rounded-lg p-3 space-y-2.5">
-                <div className="text-[10.5px] font-semibold text-slate-700">Extracted indicator</div>
+                <div className="text-[10.5px] font-medium text-slate-700">Extracted indicator</div>
                 <div className="space-y-0.5">
                   <div className="text-[10px] text-slate-400">Link</div>
                   <div className="text-[10.5px] text-brand-600 font-mono truncate">
@@ -140,8 +138,9 @@ export default function QuickCheckMockup() {
         </div>
       </div>
 
-      {/* Floating message bubble, offset off the card's top-right */}
-      <div className="hidden lg:block absolute -right-14 -top-10 w-[210px] rotate-[3deg]">
+      {/* Floating message bubble. Positioned clear of the card's top edge so it
+          frames the mockup instead of covering its content. */}
+      <div className="hidden lg:block absolute -right-10 -top-20 w-[200px] rotate-[3deg]">
         <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 space-y-2">
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
@@ -159,8 +158,8 @@ export default function QuickCheckMockup() {
         </div>
       </div>
 
-      {/* Floating evidence counter, offset off the card's bottom-right */}
-      <div className="hidden lg:flex absolute -right-10 bottom-2 items-center gap-2.5 bg-white border border-slate-200 rounded-xl shadow-lg px-3.5 py-3">
+      {/* Floating evidence counter, sitting below the card's bottom edge */}
+      <div className="hidden lg:flex absolute -right-6 -bottom-8 items-center gap-2.5 bg-white border border-slate-200 rounded-xl shadow-lg px-3.5 py-3">
         <div className="p-1.5 bg-brand-50 border border-brand-100 rounded-lg">
           <FileSpreadsheet size={15} className="text-brand-600" />
         </div>
@@ -170,13 +169,6 @@ export default function QuickCheckMockup() {
         </div>
       </div>
 
-      {/* Small floating trust marks */}
-      <div className="hidden lg:flex absolute -right-4 -top-16 w-9 h-9 bg-brand-600 rounded-xl shadow-lg items-center justify-center">
-        <BadgeCheck size={17} className="text-white" />
-      </div>
-      <div className="hidden lg:flex absolute -left-7 bottom-16 w-9 h-9 bg-white border border-slate-200 rounded-full shadow-md items-center justify-center">
-        <Lock size={14} className="text-brand-600" />
-      </div>
     </div>
   );
 }

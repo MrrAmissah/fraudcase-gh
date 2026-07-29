@@ -1,7 +1,8 @@
 import React from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Search, ArrowRight, Lock, ShieldCheck } from "lucide-react";
+import { Search, ArrowRight, Lock } from "lucide-react";
 import QuickCheckMockup from "./QuickCheckMockup";
+import RotatingHeadline from "./RotatingHeadline";
 import { staggerContainer, riseItem, scaleItem, staticVariants } from "./motionPrimitives";
 
 interface HeroSectionProps {
@@ -36,26 +37,28 @@ export default function HeroSection({ onGetStarted, onQuickCheck }: HeroSectionP
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 lg:pt-20 lg:pb-24"
+        className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 lg:pt-28 lg:pb-28"
       >
         <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-12 lg:gap-16 items-center">
           {/* Copy column */}
           <div className="space-y-6 text-center lg:text-left">
             <motion.div variants={item}>
-              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white border border-brand-200 rounded-full text-[11.5px] text-brand-700 font-semibold shadow-xs">
-                <ShieldCheck size={13} className="text-brand-600" />
-                Private. Secure. Investigator-ready.
+              {/* Solid chip on dark slate. Marked with a small brand dot rather
+                  than a shield: the shield already appears several times further
+                  down the page. */}
+              <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-slate-900 rounded-full shadow-lg shadow-slate-900/20">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+                <span className="text-[11.5px] font-medium text-white tracking-[0.06em] uppercase">
+                  Private. Secure. Investigator-ready.
+                </span>
               </span>
             </motion.div>
 
-            <motion.h1
-              variants={item}
-              id="hero-title"
-              className="text-[38px] sm:text-[48px] lg:text-[56px] font-extrabold text-slate-900 tracking-[-0.03em] leading-[1.04]"
-            >
-              Turn scam messages into a{" "}
-              <span className="text-brand-600">clear case report</span>.
-            </motion.h1>
+            {/* min-h reserves two lines so the typing cycle does not shove the
+                paragraph and buttons up and down as message lengths change. */}
+            <motion.div variants={item}>
+              <RotatingHeadline className="text-[38px] sm:text-[48px] lg:text-[56px] font-bold text-slate-900 tracking-[-0.03em] leading-[1.04] min-h-[2.08em] block" />
+            </motion.div>
 
             <motion.p
               variants={item}

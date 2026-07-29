@@ -3,11 +3,9 @@ import { motion, useReducedMotion } from "motion/react";
 import {
   MessageSquare,
   Link2,
-  Image,
   FileText,
   Phone,
   Globe,
-  User,
   Tag,
   Check,
   X,
@@ -23,8 +21,8 @@ import { staggerContainer, riseItem, staticVariants } from "./motionPrimitives";
  *
  * Everything inside the three columns is fixed sample artwork matching the
  * reference design. It intentionally mirrors the vocabulary the real workspace
- * uses (accepted / rejected facts, risk levels, evidence timeline) so the promise
- * and the product line up.
+ * uses (accepted / rejected facts, risk levels) so the promise and the product
+ * line up.
  */
 
 const INBOX = [
@@ -47,25 +45,16 @@ const INBOX = [
   {
     icon: Link2,
     tone: "bg-brand-50 text-brand-600",
-    title: "https://gh-express-delivery.com/pay",
+    title: "gh-express-delivery.com/pay",
     time: "Yesterday",
     flag: "Unverified domain",
     tag: "New domain",
-  },
-  {
-    icon: Image,
-    tone: "bg-violet-50 text-violet-600",
-    title: "Screenshot_20240621.png",
-    time: "Yesterday",
-    body: "Image · 1.2 MB",
-    flag: "Impersonation clue",
   },
 ];
 
 const FACTS = [
   { icon: Phone, label: "+233 24****456", sub: "Masked phone number" },
   { icon: Globe, label: "gh-express-delivery.com", sub: "Suspicious / unverified domain" },
-  { icon: User, label: "Impersonates courier service", sub: "Brand impersonation clue" },
   { icon: Tag, label: "Fake delivery / courier fee", sub: "Likely scam category" },
 ];
 
@@ -73,19 +62,11 @@ const FINDINGS = [
   "Impersonation of courier brand",
   "Unverified domain used in link",
   "Payment requested upfront",
-  "Multiple suspicious messages",
-];
-
-const TIMELINE = [
-  { icon: MessageSquare, tone: "text-emerald-600", title: "WhatsApp message", time: "10:42 AM", flag: "Potential delivery scam" },
-  { icon: MessageSquare, tone: "text-brand-600", title: "SMS received", time: "Yesterday", flag: "Suspicious link" },
-  { icon: Link2, tone: "text-brand-600", title: "Link detected", time: "Yesterday", flag: "Unverified domain" },
-  { icon: Image, tone: "text-violet-600", title: "Screenshot added", time: "Yesterday", flag: "Impersonation clue" },
 ];
 
 function ColumnHeader({ n, title, body }: { n: string; title: string; body: string }) {
   return (
-    <div className="flex items-start gap-3 mb-5">
+    <div className="flex items-start gap-3 mb-4">
       <span className="flex items-center justify-center flex-shrink-0 w-9 h-7 rounded-md bg-brand-600 text-white text-[12px] font-bold shadow-sm shadow-brand-600/25">
         {n}
       </span>
@@ -109,8 +90,8 @@ export default function EvidencePipeline() {
         whileInView="visible"
         viewport={{ once: true, amount: 0.12 }}
       >
-        <motion.div variants={item} className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-[30px] sm:text-[38px] font-extrabold text-slate-900 tracking-[-0.025em] leading-tight">
+        <motion.div variants={item} className="text-center max-w-3xl mx-auto mb-10">
+          <h2 className="text-[30px] sm:text-[38px] font-bold text-slate-900 tracking-[-0.025em] leading-tight">
             Turn messy evidence into a{" "}
             <span className="text-brand-600">case-ready file</span>.
           </h2>
@@ -121,23 +102,25 @@ export default function EvidencePipeline() {
         </motion.div>
 
         {/* The column headings are real section copy and stay in the accessibility
-            tree. Only the sample cards below each heading are decorative. */}
-        <div className="grid lg:grid-cols-3 gap-5">
+            tree. Only the sample cards below each heading are decorative.
+            items-start lets each card hug its content: stretching them to a
+            common height left large dead areas under the two shorter columns. */}
+        <div className="grid lg:grid-cols-3 gap-5 items-start">
           {/* 01 — Collect */}
           <motion.div
             variants={item}
-            className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
           >
             <ColumnHeader
               n="01"
               title="Collect & import evidence"
               body="Gather messages, links, screenshots, documents, and more."
             />
-            <div className="space-y-2.5" aria-hidden="true">
+            <div className="space-y-2" aria-hidden="true">
               {INBOX.map((m, i) => (
                 <div
                   key={i}
-                  className="border border-slate-200 rounded-xl p-3 hover:border-brand-200 hover:bg-brand-50/20 transition-colors"
+                  className="border border-slate-200 rounded-lg p-2.5 hover:border-brand-200 hover:bg-brand-50/20 transition-colors"
                 >
                   <div className="flex items-start gap-2.5">
                     <span className={`flex items-center justify-center w-7 h-7 rounded-lg flex-shrink-0 ${m.tone}`}>
@@ -145,7 +128,7 @@ export default function EvidencePipeline() {
                     </span>
                     <div className="min-w-0 flex-grow">
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[12px] font-semibold text-slate-800 truncate">
+                        <span className="text-[12px] font-medium text-slate-800 truncate">
                           {m.title}
                         </span>
                         <span className="text-[9.5px] text-slate-400 flex-shrink-0">{m.time}</span>
@@ -168,7 +151,7 @@ export default function EvidencePipeline() {
                 </div>
               ))}
 
-              <div className="border border-dashed border-slate-300 rounded-xl p-4 text-center">
+              <div className="border border-dashed border-slate-300 rounded-lg p-3 text-center">
                 <Upload size={15} className="text-slate-400 mx-auto mb-1.5" />
                 <div className="text-[11.5px] text-slate-600 font-medium">
                   Drop files here or click to upload
@@ -183,7 +166,7 @@ export default function EvidencePipeline() {
           {/* 02 — Verify */}
           <motion.div
             variants={item}
-            className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
           >
             <ColumnHeader
               n="02"
@@ -191,8 +174,8 @@ export default function EvidencePipeline() {
               body="AI surfaces risks and facts you can verify. You accept what is true and reject what is noise."
             />
 
-            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5" aria-hidden="true">
-              <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
+            <div className="border border-slate-200 rounded-lg p-3 space-y-2" aria-hidden="true">
+              <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-700">
                 <ShieldCheck size={13} className="text-brand-600" />
                 Detected facts
               </div>
@@ -215,8 +198,8 @@ export default function EvidencePipeline() {
               ))}
             </div>
 
-            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5 mt-3" aria-hidden="true">
-              <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
+            <div className="border border-slate-200 rounded-lg p-3 space-y-2 mt-3" aria-hidden="true">
+              <div className="flex items-center gap-1.5 text-[11.5px] font-medium text-slate-700">
                 <X size={13} className="text-slate-400" />
                 Rejected / dismissed
               </div>
@@ -238,17 +221,17 @@ export default function EvidencePipeline() {
           {/* 03 — Report */}
           <motion.div
             variants={item}
-            className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
+            className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow"
           >
             <ColumnHeader
               n="03"
               title="Get a clean, report-ready case file"
-              body="Export a structured PDF with timeline, evidence, and risk summary."
+              body="Export a structured PDF with evidence, key findings, and a risk summary."
             />
 
-            <div className="border border-slate-200 rounded-xl p-4 space-y-3" aria-hidden="true">
+            <div className="border border-slate-200 rounded-lg p-3.5 space-y-2.5" aria-hidden="true">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-bold text-slate-900">Case Summary</span>
+                <span className="text-[13px] font-semibold text-slate-900">Case Summary</span>
                 <span className="px-2 py-0.5 text-[9.5px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded">
                   High risk
                 </span>
@@ -265,7 +248,7 @@ export default function EvidencePipeline() {
                 <div>
                   <div className="text-[10px] text-slate-400 mb-0.5">Risk score</div>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[26px] font-extrabold text-slate-900 leading-none font-mono">
+                    <span className="text-[26px] font-bold text-slate-900 leading-none font-mono">
                       88
                     </span>
                     <span className="text-[11px] text-slate-400">/100</span>
@@ -306,30 +289,6 @@ export default function EvidencePipeline() {
               </div>
             </div>
 
-            {/* Evidence timeline */}
-            <div className="border border-slate-200 rounded-xl p-4 mt-3" aria-hidden="true">
-              <div className="text-[12.5px] font-bold text-slate-900 mb-3">Evidence timeline</div>
-              <div className="relative space-y-3.5">
-                <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200" />
-                {TIMELINE.map((t, i) => (
-                  <div key={i} className="relative flex items-start gap-3 pl-0">
-                    <span className="relative z-10 w-[11px] h-[11px] rounded-full border-2 border-brand-400 bg-white flex-shrink-0 mt-1" />
-                    <t.icon size={13} className={`${t.tone} flex-shrink-0 mt-0.5`} />
-                    <div className="min-w-0 flex-grow">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="text-[11.5px] font-semibold text-slate-800 truncate">
-                          {t.title}
-                        </span>
-                        <span className="text-[9.5px] text-slate-400 flex-shrink-0">{t.time}</span>
-                      </div>
-                      <span className="inline-block px-1.5 py-px text-[9px] bg-red-50 text-red-600 border border-red-200 rounded mt-1">
-                        {t.flag}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </motion.div>
         </div>
 

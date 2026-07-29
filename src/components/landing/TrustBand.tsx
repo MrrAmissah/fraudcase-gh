@@ -55,7 +55,7 @@ export default function TrustBand() {
           className="relative flex items-center justify-center gap-2.5 mb-9 text-center"
         >
           <ShieldCheck size={22} className="text-brand-600 flex-shrink-0" strokeWidth={2} />
-          <h2 className="text-[21px] sm:text-[24px] font-extrabold text-slate-900 tracking-tight">
+          <h2 className="text-[21px] sm:text-[24px] font-bold text-slate-900 tracking-tight">
             Built for privacy. Designed for trust.
           </h2>
         </motion.div>
@@ -64,7 +64,7 @@ export default function TrustBand() {
           {ITEMS.map((it) => (
             <motion.div key={it.title} variants={item} className="lg:px-6 first:lg:pl-0 last:lg:pr-0">
               <it.icon size={22} className="text-brand-600 mb-3" strokeWidth={1.9} />
-              <div className="text-[14px] font-semibold text-slate-900 mb-1.5">{it.title}</div>
+              <div className="text-[14px] font-medium text-slate-900 mb-1.5">{it.title}</div>
               <p className="text-[12.5px] text-slate-600 leading-relaxed">{it.body}</p>
             </motion.div>
           ))}
