@@ -33,12 +33,22 @@ export default function RotatingHeadline({ className = "" }: { className?: strin
   const [messageIndex, setMessageIndex] = useState(0);
   const [charCount, setCharCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   const message = MESSAGES[messageIndex];
   const full = message.lead + message.accent;
 
+  // Typing runs on a ~45ms timer chain. Stop it while the tab is in the
+  // background rather than animating text nobody is looking at.
   useEffect(() => {
-    if (reduced) return;
+    const onVisibility = () => setHidden(document.hidden);
+    onVisibility();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+
+  useEffect(() => {
+    if (reduced || hidden) return;
 
     // Finished typing: hold, then start deleting.
     if (!deleting && charCount === full.length) {
@@ -58,7 +68,7 @@ export default function RotatingHeadline({ className = "" }: { className?: strin
       deleting ? DELETE_MS : TYPE_MS,
     );
     return () => clearTimeout(tick);
-  }, [charCount, deleting, full.length, reduced]);
+  }, [charCount, deleting, full.length, reduced, hidden]);
 
   // Reduced motion: show the first message in full, no typing.
   const shown = reduced ? full : full.slice(0, charCount);
@@ -69,10 +79,25 @@ export default function RotatingHeadline({ className = "" }: { className?: strin
   return (
     <h1
       id="hero-title"
-      className={className}
+      className={`grid ${className}`}
       aria-label="Turn scam messages into a clear case report."
     >
-      <span aria-hidden="true">
+      {/* Invisible sizers. Every message is stacked into the same grid cell, so
+          the heading is always exactly as tall as the longest one wraps at the
+          current width. A fixed min-height cannot do this: at 390px some of
+          these wrap to three lines and others to two, which shifted the page
+          each time the text changed. */}
+      {MESSAGES.map((m) => (
+        <span
+          key={m.accent}
+          aria-hidden="true"
+          className="col-start-1 row-start-1 invisible"
+        >
+          {m.lead + m.accent}.
+        </span>
+      ))}
+
+      <span aria-hidden="true" className="col-start-1 row-start-1">
         {leadShown}
         <span className="text-brand-600">{accentShown}</span>
         {/* The full stop belongs to a finished sentence only. Showing it while

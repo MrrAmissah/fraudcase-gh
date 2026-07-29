@@ -52,10 +52,10 @@ export default function HeroSection({ onGetStarted, onQuickCheck }: HeroSectionP
               </span>
             </motion.div>
 
-            {/* min-h reserves two lines so the typing cycle does not shove the
-                paragraph and buttons up and down as message lengths change. */}
+            {/* The headline reserves its own height from the longest message, so
+                the typing cycle never shifts the paragraph and buttons below it. */}
             <motion.div variants={item}>
-              <RotatingHeadline className="text-[38px] sm:text-[48px] lg:text-[56px] font-bold text-slate-900 tracking-[-0.03em] leading-[1.04] min-h-[2.08em] block" />
+              <RotatingHeadline className="text-[38px] sm:text-[48px] lg:text-[56px] font-bold text-slate-900 tracking-[-0.03em] leading-[1.04]" />
             </motion.div>
 
             <motion.p
