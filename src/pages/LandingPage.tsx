@@ -14,11 +14,13 @@ interface LandingPageProps {
 
 export default function LandingPage({ onStart, onQuickCheck }: LandingPageProps) {
   return (
-    <div className="w-full" id="landing-page">
+    <div className="w-full flex flex-col flex-grow" id="landing-page">
       <HeroSection onGetStarted={onStart} onQuickCheck={onQuickCheck} />
 
-      {/* Everything below the hero shares one rhythm on the tinted canvas. */}
-      <div className="bg-canvas border-t border-slate-100">
+      {/* Everything below the hero shares one rhythm on the tinted canvas.
+          flex-grow keeps the tint running to the footer so no slate-50 sliver
+          from the app shell shows through at the seam on short pages. */}
+      <div className="bg-canvas border-t border-slate-100 flex-grow">
         <div className="space-y-20 lg:space-y-24 py-16 lg:py-20">
           <TrustStrip />
           <HowItWorks />

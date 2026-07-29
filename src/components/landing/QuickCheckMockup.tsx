@@ -72,8 +72,10 @@ export default function QuickCheckMockup() {
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="flex-shrink-0 scale-[0.82] origin-left">
-                <RiskGauge score={88} size={104} />
+              {/* Sized via the prop rather than a CSS transform: `scale` would still
+                  reserve the full-size layout box and open a gap beside the gauge. */}
+              <div className="flex-shrink-0">
+                <RiskGauge score={88} size={86} />
               </div>
               <div className="space-y-1.5 min-w-0">
                 <div className="text-[11px] text-slate-500">Possible category</div>

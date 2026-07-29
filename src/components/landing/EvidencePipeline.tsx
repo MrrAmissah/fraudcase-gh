@@ -120,7 +120,9 @@ export default function EvidencePipeline() {
           </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-3 gap-5" aria-hidden="true">
+        {/* The column headings are real section copy and stay in the accessibility
+            tree. Only the sample cards below each heading are decorative. */}
+        <div className="grid lg:grid-cols-3 gap-5">
           {/* 01 — Collect */}
           <motion.div
             variants={item}
@@ -131,7 +133,7 @@ export default function EvidencePipeline() {
               title="Collect & import evidence"
               body="Gather messages, links, screenshots, documents, and more."
             />
-            <div className="space-y-2.5">
+            <div className="space-y-2.5" aria-hidden="true">
               {INBOX.map((m, i) => (
                 <div
                   key={i}
@@ -189,7 +191,7 @@ export default function EvidencePipeline() {
               body="AI surfaces risks and facts you can verify. You accept what is true and reject what is noise."
             />
 
-            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5" aria-hidden="true">
               <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
                 <ShieldCheck size={13} className="text-brand-600" />
                 Detected facts
@@ -213,7 +215,7 @@ export default function EvidencePipeline() {
               ))}
             </div>
 
-            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5 mt-3">
+            <div className="border border-slate-200 rounded-xl p-3.5 space-y-2.5 mt-3" aria-hidden="true">
               <div className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-700">
                 <X size={13} className="text-slate-400" />
                 Rejected / dismissed
@@ -244,7 +246,7 @@ export default function EvidencePipeline() {
               body="Export a structured PDF with timeline, evidence, and risk summary."
             />
 
-            <div className="border border-slate-200 rounded-xl p-4 space-y-3">
+            <div className="border border-slate-200 rounded-xl p-4 space-y-3" aria-hidden="true">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-bold text-slate-900">Case Summary</span>
                 <span className="px-2 py-0.5 text-[9.5px] font-semibold bg-red-50 text-red-700 border border-red-200 rounded">
@@ -305,7 +307,7 @@ export default function EvidencePipeline() {
             </div>
 
             {/* Evidence timeline */}
-            <div className="border border-slate-200 rounded-xl p-4 mt-3">
+            <div className="border border-slate-200 rounded-xl p-4 mt-3" aria-hidden="true">
               <div className="text-[12.5px] font-bold text-slate-900 mb-3">Evidence timeline</div>
               <div className="relative space-y-3.5">
                 <div className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-slate-200" />
