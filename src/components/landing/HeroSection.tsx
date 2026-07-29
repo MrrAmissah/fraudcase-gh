@@ -1,6 +1,6 @@
 import React from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Search, ArrowRight, Lock } from "lucide-react";
+import { Search, ArrowRight } from "lucide-react";
 import QuickCheckMockup from "./QuickCheckMockup";
 import RotatingHeadline from "./RotatingHeadline";
 import { staggerContainer, riseItem, scaleItem, staticVariants } from "./motionPrimitives";
@@ -43,11 +43,9 @@ export default function HeroSection({ onGetStarted, onQuickCheck }: HeroSectionP
           {/* Copy column */}
           <div className="space-y-6 text-center lg:text-left">
             <motion.div variants={item}>
-              {/* Solid chip on dark slate. Marked with a small brand dot rather
-                  than a shield: the shield already appears several times further
-                  down the page. */}
-              <span className="inline-flex items-center gap-2.5 px-4 py-2 bg-slate-900 rounded-full shadow-lg shadow-slate-900/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-brand-400 flex-shrink-0" />
+              {/* Solid chip on dark slate, text only. The shield icon it used to
+                  carry already appears several times further down the page. */}
+              <span className="inline-flex items-center px-4 py-2 bg-slate-900 rounded-full shadow-lg shadow-slate-900/20">
                 <span className="text-[11.5px] font-medium text-white tracking-[0.06em] uppercase">
                   Private. Secure. Investigator-ready.
                 </span>
@@ -93,13 +91,6 @@ export default function HeroSection({ onGetStarted, onQuickCheck }: HeroSectionP
               </button>
             </motion.div>
 
-            <motion.div
-              variants={item}
-              className="flex items-center justify-center lg:justify-start gap-2 text-[12px] text-slate-500"
-            >
-              <Lock size={12.5} className="text-brand-600 flex-shrink-0" />
-              <span>Sensitive data is redacted before analysis. Quick Check stores nothing.</span>
-            </motion.div>
           </div>
 
           {/* Product artwork column */}

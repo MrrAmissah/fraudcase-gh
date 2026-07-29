@@ -18,6 +18,7 @@ import { useReducedMotion } from "motion/react";
    lines, and a longer message would wrap to three and shove the page down. */
 const MESSAGES = [
   { lead: "Turn scam messages into a ", accent: "clear case report" },
+  { lead: "Quick Check any message in ", accent: "seconds" },
   { lead: "Turn scattered chats into an ", accent: "organized case" },
   { lead: "Turn a suspicious link into a ", accent: "clear signal" },
   { lead: "Turn screenshots into ", accent: "structured evidence" },
