@@ -19,7 +19,7 @@ export default function LandingPage({ onStart, onQuickCheck }: LandingPageProps)
           flex-grow keeps the tint running to the footer so no slate-50 sliver
           from the app shell shows through at the seam on short pages. */}
       <div className="bg-canvas border-t border-slate-100 flex-grow">
-        <div className="space-y-16 lg:space-y-20 py-14 lg:py-16">
+        <div className="space-y-14 lg:space-y-16 py-12 lg:py-14">
           <TrustStrip />
           <HowItWorks />
           <EvidencePipeline />

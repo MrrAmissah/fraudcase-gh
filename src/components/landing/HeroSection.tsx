@@ -37,7 +37,7 @@ export default function HeroSection({ onGetStarted, onQuickCheck }: HeroSectionP
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16 lg:pt-28 lg:pb-28"
+        className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-12 lg:pt-24 lg:pb-16"
       >
         <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] gap-12 lg:gap-16 items-center">
           {/* Copy column */}
