@@ -63,7 +63,7 @@ FraudCase GH **organizes** evidence into a private case, **assesses** risk with 
 | Backend | Node.js, Express, `tsx` (dev), `esbuild` bundle (prod), containerized on **Google Cloud Run** |
 | Auth / Data / Files | Firebase Authentication (email/password), Cloud Firestore (named DB), Firebase Cloud Storage |
 | Server credentials | Firebase Admin SDK via **Application Default Credentials (ADC)**: no service-account keys |
-| AI | Google **Gemini `gemini-2.5-flash`** via `@google/genai`, **Vertex AI (ADC)** in production, or the Gemini API key elsewhere; deterministic heuristic fallback |
+| AI | Google **Gemini `gemini-3.1-flash-lite`** via `@google/genai`, **Vertex AI (ADC)** in production, or the Gemini API key elsewhere; deterministic heuristic fallback |
 | Tests / CI | `node:test` via `tsx`; GitHub Actions (test/lint/build + npm-audit + provenance) |
 
 ---
@@ -144,9 +144,9 @@ No secret values are shown here. See `.env.example`; real values belong only in 
 | `VITE_FIREBASE_*` (7 keys) | Client (build-time) | Yes | Firebase **web** config, public by design (ships in the bundle) |
 | `MULTIMODAL_EXTRACTION_ENABLED` | Server | No | `true` enables image/PDF extraction (default off) |
 | `GOOGLE_GENAI_USE_VERTEXAI` | Server | No | `true` routes Gemini through Vertex AI (ADC, Cloud-billed); else uses `GEMINI_API_KEY` |
-| `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` | Server | No | Vertex project/region (defaults: project id / `us-central1`) |
+| `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` | Server | No | Vertex project/location (defaults: project id / `global`). Gemini 3.x 404s outside `global`. |
 | `GEMINI_API_KEY` | Server | No | Used only when not in Vertex mode; unset ⇒ heuristic fallback |
-| `GEMINI_MODEL` | Server | No | Override the model (default `gemini-2.5-flash`) |
+| `GEMINI_MODEL` | Server | No | Override the model (default `gemini-3.1-flash-lite`) |
 | `FIRESTORE_DATABASE_ID` | Server | No | Override the server Firestore DB id (default: provisioned named DB) |
 | `ADMIN_EMAILS` | Server | No | Admin allowlist; **fail-closed** if empty |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Server | No | Service-account JSON path; **not needed with ADC / on Cloud Run** |
