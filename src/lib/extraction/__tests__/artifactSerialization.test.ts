@@ -9,7 +9,7 @@ import { redactPIIAndSecrets } from "../../security/redaction";
  * route returns the artifact via `res.json(...)` i.e. `JSON.stringify`, which MUST escape those
  * control characters so the response is parseable by strict JSON parsers (browsers' `JSON.parse`,
  * `jq`, Go/Java decoders). This locks that invariant: an earlier report of "raw unescaped newlines"
- * traced to a debugging capture artifact (`echo` re-expanding `\n`), not the server — these tests
+ * traced to a debugging capture artifact (`echo` re-expanding `\n`), not the server, these tests
  * ensure a future change (e.g. a hand-rolled serializer) can't reintroduce a real break.
  */
 

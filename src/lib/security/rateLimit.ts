@@ -4,7 +4,7 @@
  * This extracts the previously-inline in-memory limiters from server.ts behind a
  * small async {@link RateLimitStore} interface so a Redis/Upstash-backed shared
  * store (for multi-instance production) can be slotted in later via
- * RATE_LIMIT_REDIS_URL — see docs/SHARED_RATE_LIMIT_PLAN.md.
+ * RATE_LIMIT_REDIS_URL, see docs/SHARED_RATE_LIMIT_PLAN.md.
  *
  * Behavior is preserved exactly with the default in-memory store: the same daily
  * and burst caps, the same fixed-window semantics, the same 429 messages, and the
@@ -50,7 +50,7 @@ export interface RateLimitStore {
 /**
  * In-memory store replicating the original server.ts limiter logic exactly,
  * including the "do not increment once at the cap" behavior and the opportunistic
- * stale-bucket cleanup. Per-process only — not shared across instances.
+ * stale-bucket cleanup. Per-process only, not shared across instances.
  */
 export class MemoryRateLimitStore implements RateLimitStore {
   private readonly daily = new Map<string, { count: number; day: string }>();

@@ -1,4 +1,4 @@
-# Firebase Cloud Storage — Recommended Security Rules
+# Firebase Cloud Storage, Recommended Security Rules
 
 Companion to `firestore.rules`. Covers the evidence-file bucket used by FraudCase GH.
 
@@ -11,19 +11,19 @@ the `/evidence/upload` route):
 users/{uid}/cases/{caseId}/evidence/{evidenceId}/{fileName}
 ```
 
-## ⚠️ Current enforcement model — these rules are DORMANT today
+## ⚠️ Current enforcement model, these rules are DORMANT today
 
 Exactly as with `firestore.rules`, **the Express backend uses the Firebase Admin SDK, which
 bypasses Storage Security Rules entirely.** All current access is mediated by the server:
 
-- **Upload** (`POST /api/cases/:id/evidence/upload`) — `requireAuth` verifies the Firebase ID
+- **Upload** (`POST /api/cases/:id/evidence/upload`), `requireAuth` verifies the Firebase ID
   token, then the handler checks `caseData.ownerId === req.user.uid` before writing.
-- **Download** (`GET /api/cases/:id/evidence/:evidenceId/file`) — same token + ownership check;
+- **Download** (`GET /api/cases/:id/evidence/:evidenceId/file`), same token + ownership check;
   the file is streamed back through the server, never via a public/object URL.
 - Clients **never** touch Cloud Storage directly.
 
 So today, security rests on the Express layer. The rules below are **recommended and should be
-deployed as defense-in-depth**, and they become **load-bearing** the moment any direct-client
+deployed as defense-in-depth**: and they become **load-bearing** the moment any direct-client
 Storage access is introduced (e.g. switching to client SDK uploads or signed URLs). Deploy them
 now so that path is safe by default.
 
@@ -65,7 +65,7 @@ service firebase.storage {
 ```
 
 ### Notes
-- `request.auth.uid == uid` enforces that the path's user segment matches the caller — the same
+- `request.auth.uid == uid` enforces that the path's user segment matches the caller, the same
   owner-isolation the Express layer enforces.
 - Storage rules **cannot** validate file *content* (magic bytes). That check lives server-side in
   `src/lib/security/fileValidation.ts`. The `contentType` constraint here only filters the declared

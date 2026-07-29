@@ -7,7 +7,7 @@ until enabled with approval). AbuseIPDB/urlscan are scoped stubs. See
 
 This document captures the technical design for adding external/internal reputation enrichment and curated fraud alerts to FraudCase GH. It is the roadmap; the providers doc tracks what is live.
 
-Language rules for this feature (non-negotiable): use **external reputation signal**, **possible match**, **flagged by source**, **needs verification**, **not confirmed fraud**. Never use **confirmed scam**, **confirmed fraud**, or **scammer database**.
+Language rules for this feature (non-negotiable): use **external reputation signal**, **possible match**, **flagged by source**, **needs verification**, **not confirmed fraud**. Never use **confirmed scam**, **confirmed fraud**: or **scammer database**.
 
 ---
 
@@ -20,7 +20,7 @@ FraudCase GH should not rely only on AI text interpretation. AI reads language; 
 - Cache results to control cost and latency.
 - Pass **structured reputation signals** into the analysis pipeline as grounded inputs, clearly separated from AI interpretation.
 
-The output frames everything as a **possible match / external reputation signal that needs verification**, never as a confirmation of fraud or an accusation of a person.
+The output frames everything as a **possible match / external reputation signal that needs verification**: never as a confirmation of fraud or an accusation of a person.
 
 ---
 
@@ -170,15 +170,15 @@ interface FraudAlert {
 
 ## 5. Provider strategy (tiers)
 
-**Tier 0 — local heuristics** (no network): URL shorteners; lookalike domains; punycode/homograph; suspicious TLDs; brand mismatch; urgent-payment keywords near a URL; non-official domain claiming to be Ghana Post, a bank, a telco, or a delivery company.
+**Tier 0: local heuristics** (no network): URL shorteners; lookalike domains; punycode/homograph; suspicious TLDs; brand mismatch; urgent-payment keywords near a URL; non-official domain claiming to be Ghana Post, a bank, a telco, or a delivery company.
 
-**Tier 1 — cache / internal**: prior redacted community signals; admin-approved fraud alerts; locally cached previous provider lookups; a known-legitimate-domain allowlist.
+**Tier 1: cache / internal**: prior redacted community signals; admin-approved fraud alerts; locally cached previous provider lookups; a known-legitimate-domain allowlist.
 
-**Tier 2 — Google Safe Browsing**: fast malware/social-engineering URL match; batch multiple URLs when possible; cache both no-match and match per policy; **a no-match is "not found in this source", never "safe"**.
+**Tier 2: Google Safe Browsing**: fast malware/social-engineering URL match; batch multiple URLs when possible; cache both no-match and match per policy; **a no-match is "not found in this source", never "safe"**.
 
-**Tier 3 — VirusTotal**: deeper enrichment for URLs/domains/IPs; used only when needed (high-risk cases, private case review, admin review, or explicit user request for a deeper check); avoid submitting private/sensitive URLs without policy/consent; cache aggressively; never expose the API key client-side; **one vendor flag is not proof**.
+**Tier 3: VirusTotal**: deeper enrichment for URLs/domains/IPs; used only when needed (high-risk cases, private case review, admin review, or explicit user request for a deeper check); avoid submitting private/sensitive URLs without policy/consent; cache aggressively; never expose the API key client-side; **one vendor flag is not proof**.
 
-**Tier 4 — future MISP / trusted feeds**: admin-curated feeds; possible Ghana/Africa threat-intel ingestion; strict source registry and approval workflow.
+**Tier 4: future MISP / trusted feeds**: admin-curated feeds; possible Ghana/Africa threat-intel ingestion; strict source registry and approval workflow.
 
 ---
 
@@ -232,7 +232,7 @@ THREAT_INTEL_PROVIDER_TIMEOUT_MS
 - Multiple independent provider matches increase confidence.
 - Recency matters; stale verdicts decay.
 - Source reliability matters (weight per source).
-- Provider disagreement is **shown as disagreement**, not hidden.
+- Provider disagreement is **shown as disagreement**: not hidden.
 - Output separates: source-grounded signals, heuristic signals, and model interpretation.
 
 Risk labels (all non-accusatory): **Low**, **Caution**, **Elevated**, **High**, **Critical**.

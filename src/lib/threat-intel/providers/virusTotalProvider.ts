@@ -45,7 +45,7 @@ async function lookup(kind: LookupKind, value: string, ctx: ProviderLookupContex
   if (!path) return unavailableVerdict("virustotal", "unsupported indicator kind", now);
 
   try {
-    // GET only — passive report retrieval. No submission/upload endpoints are ever used.
+    // GET only, passive report retrieval. No submission/upload endpoints are ever used.
     const res = await ctx.fetchImpl(`${BASE}${path}`, { method: "GET", headers: { "x-apikey": key } });
     if (res.status === 404) {
       return {

@@ -5,12 +5,12 @@ import { formatDate } from "../utils/dates";
 import { redactPIIAndSecrets } from "../security/redaction";
 
 /**
- * Client-side case-report PDF generator (jsPDF, text-based / selectable — not a raster
+ * Client-side case-report PDF generator (jsPDF, text-based / selectable, not a raster
  * screenshot). jsPDF is lazy-imported so it stays out of the main bundle.
  *
  * Privacy: EVERY piece of free text written to the PDF is passed through the redaction
  * guard first, so passwords/PINs/cards/accounts/emails are masked and phone numbers are
- * partially masked. Raw uploaded files and raw `originalText` are never embedded — only
+ * partially masked. Raw uploaded files and raw `originalText` are never embedded, only
  * already-redacted text (redactedText/extractedText).
  */
 
@@ -45,7 +45,7 @@ export function reportPdfFilename(fraudCase: FraudCase, when: Date = new Date())
   return `fraudcase-report-${idPart}-${datePart}.pdf`;
 }
 
-/** Builds the PDF document (no save) — separated so it is unit-testable in Node. */
+/** Builds the PDF document (no save), separated so it is unit-testable in Node. */
 export async function buildReportPdf(fraudCase: FraudCase): Promise<jsPDF> {
   const mod = await import("jspdf");
   const JsPDF = (mod as any).jsPDF || (mod as any).default;
@@ -307,7 +307,7 @@ export async function buildReportPdf(fraudCase: FraudCase): Promise<jsPDF> {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(...NAVY);
-      const line = `${safe(c.item)} — ${status}`;
+      const line = `${safe(c.item)}, ${status}`;
       const lines = doc.splitTextToSize(line, CONTENT_W) as string[];
       ensure(lines.length * 12 + 2);
       for (const l of lines) {

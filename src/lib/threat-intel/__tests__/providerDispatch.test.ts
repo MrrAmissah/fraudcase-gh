@@ -34,7 +34,7 @@ function mockProvider(opts: { enabled: boolean; calls?: { n: number }; throws?: 
   };
 }
 
-// fetch that throws — proves providers in tests cannot reach the network unmocked.
+// fetch that throws, proves providers in tests cannot reach the network unmocked.
 const noNetworkFetch = (async () => {
   throw new Error("no network in tests");
 }) as unknown as typeof fetch;
@@ -74,7 +74,7 @@ test("dispatch: provider errors normalize to a safe verdict (rate_limited), neve
   assert.equal(r.verdictsByIndicator.get("https://x.xyz")?.[0].status, "rate_limited");
 });
 
-test("dispatch: cache-first — provider invoked once across two runs", async () => {
+test("dispatch: cache-first, provider invoked once across two runs", async () => {
   const calls = { n: 0 };
   const cache = createMemoryCache(() => 1000);
   const provider = mockProvider({ enabled: true, calls });

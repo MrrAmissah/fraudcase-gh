@@ -1,4 +1,4 @@
-# Threat-intel providers — setup & status
+# Threat-intel providers, setup & status
 
 Implements part of [`THREAT_INTEL_ENRICHMENT_PLAN.md`](./THREAT_INTEL_ENRICHMENT_PLAN.md). All provider
 calls are **server-side only** and **disabled by default**. Provider API keys are **never** exposed to
@@ -37,11 +37,11 @@ key ⇒ calm `Unavailable`/`Not checked` status, never an error to the user.
 - Only **accepted/verified** extracted facts feed enrichment (never suggestions, rejected facts, or raw
   evidence/OCR/screenshots/PDFs).
 - Indicators carrying tokens/signed-URLs/PII are classed `do_not_send_external` and are **withheld at
-  dispatch** — they never reach any external provider.
+  dispatch**: they never reach any external provider.
 - Phones/emails are never sent to URL/IP reputation providers.
-- VirusTotal uses **GET reports only** — no `POST /urls` (submission) and no `POST /files` (upload).
-- urlscan (when built) will **search existing public scans only** — never auto-submit user URLs.
-- AbuseIPDB **checks accepted PUBLIC IPv4 only** (private/loopback/link-local/CGNAT/multicast/reserved/documentation ranges are excluded at extraction) via `GET /api/v2/check` — never the report endpoint.
+- VirusTotal uses **GET reports only**: no `POST /urls` (submission) and no `POST /files` (upload).
+- urlscan (when built) will **search existing public scans only**: never auto-submit user URLs.
+- AbuseIPDB **checks accepted PUBLIC IPv4 only** (private/loopback/link-local/CGNAT/multicast/reserved/documentation ranges are excluded at extraction) via `GET /api/v2/check`, never the report endpoint.
 
 ## Wording (required / forbidden)
 

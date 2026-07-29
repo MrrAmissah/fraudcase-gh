@@ -1,4 +1,4 @@
-# FraudCase GH — Architecture Overview
+# FraudCase GH, Architecture Overview
 
 This document describes the components of FraudCase GH and how requests flow through them. It is accurate to the implementation in `server.ts` and `src/`.
 
@@ -9,7 +9,7 @@ This document describes the components of FraudCase GH and how requests flow thr
 FraudCase GH is a **single full-stack service**. One Express server (`server.ts`) both:
 
 1. Exposes the JSON API under `/api/*`, and
-2. Serves the React client — via **Vite middleware in development** and the **static `dist/` build + bundled `dist/server.cjs`** in production.
+2. Serves the React client, via **Vite middleware in development** and the **static `dist/` build + bundled `dist/server.cjs`** in production.
 
 It binds to port `3000`.
 
@@ -69,7 +69,7 @@ It binds to port `3000`.
 - File bytes are served back through an authenticated, ownership-checked endpoint (not via public URLs).
 
 ### Firebase Admin SDK
-- Initialized in `src/lib/firebase/admin.ts` with `initializeApp({ projectId, storageBucket })` and **no explicit credential** — so it resolves **Application Default Credentials** automatically (env var → `gcloud` ADC file → metadata server).
+- Initialized in `src/lib/firebase/admin.ts` with `initializeApp({ projectId, storageBucket })` and **no explicit credential**: so it resolves **Application Default Credentials** automatically (env var → `gcloud` ADC file → metadata server).
 - Provides `adminAuth`, `adminDb` (Firestore), and `adminStorage`.
 
 ### Gemini API
@@ -94,11 +94,11 @@ Optional follow-ups from the result: **save as a private case** (requires auth) 
 ### 2. Private case (authenticated, owner-isolated)
 ```
 POST   /api/cases                         create case (ownerId = token uid)
-GET    /api/cases                         list — where ownerId == uid
-GET    /api/cases/:id                     read — re-checks ownerId
+GET    /api/cases                         list, where ownerId == uid
+GET    /api/cases/:id                     read, re-checks ownerId
 POST   /api/cases/:id/evidence            add text evidence (redacted on store)
 POST   /api/cases/:id/evidence/upload     upload file → validate → Cloud Storage
-GET    /api/cases/:id/evidence/:eid/file  download — ownership-checked stream
+GET    /api/cases/:id/evidence/:eid/file  download, ownership-checked stream
 POST   /api/cases/:id/analyze             run analyzeFraudCase over the evidence
 GET    /api/cases/:id/report              fetch the report payload
 PUT/PATCH /api/cases/:id                  update (field-whitelisted; ownerId immutable)
@@ -112,7 +112,7 @@ POST  /api/quick-check/submit-signal      public, rate-limited
         → stores ONLY redacted/derived data (no raw input, no files)
 
 GET   /api/admin/community-signals        requireAdmin (ADMIN_EMAILS allowlist)
-PATCH /api/admin/community-signals/:id    requireAdmin — review status/notes (redacted)
+PATCH /api/admin/community-signals/:id    requireAdmin, review status/notes (redacted)
 GET   /api/admin/me                       capability probe (is the caller an admin?)
 ```
 `requireAdmin` is **fail-closed**: with no allowlisted emails, every authenticated user is denied.

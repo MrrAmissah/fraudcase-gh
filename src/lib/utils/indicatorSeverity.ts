@@ -3,7 +3,7 @@
  * SuspiciousIndicators badges and the analysis visual summary so the two never diverge.
  *
  * This is presentational (how strongly to flag an indicator in the UI), NOT a security control.
- * Unmatched indicators default to "Medium" — never "Low" — so real fraud signals that lack the
+ * Unmatched indicators default to "Medium", never "Low", so real fraud signals that lack the
  * high-risk trigger words are not visually understated.
  */
 export type IndicatorSeverity = "High" | "Medium";

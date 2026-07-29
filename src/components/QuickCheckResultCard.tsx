@@ -58,7 +58,7 @@ export default function QuickCheckResultCard({
 
   const handleCopy = async () => {
     const summary = [
-      `FraudCase GH — Quick Check result`,
+      `FraudCase GH: Quick Check result`,
       `Possible category: ${getScamCategoryLabel(result.scamCategory)}`,
       `Risk signal: ${risk.label} (${result.riskScore}/100, ${result.confidence} confidence)`,
       ``,
@@ -78,7 +78,7 @@ export default function QuickCheckResultCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard unavailable — no-op */
+      /* clipboard unavailable, no-op */
     }
   };
 
@@ -188,7 +188,7 @@ export default function QuickCheckResultCard({
           </button>
           <button
             onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all"
             id="quick-check-copy"
           >
             {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} className="text-slate-500" />}
@@ -259,7 +259,7 @@ export default function QuickCheckResultCard({
                     setShareError(null);
                   }}
                   disabled={shareState === "sharing"}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-250 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-sans font-semibold cursor-pointer transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>

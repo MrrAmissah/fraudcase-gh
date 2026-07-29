@@ -8,7 +8,7 @@ const BARE_RE = /(?<![\w@.])((?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,
 /** Ghana-style or masked phone (e.g. 0244000019 or 0244***019). Internal-only either way. */
 const PHONE_RE = /\b0[\d*]{8,11}\b/g;
 
-/** Recognized TLDs — a bare domain without a path is only accepted if its TLD is here (cuts false positives). */
+/** Recognized TLDs, a bare domain without a path is only accepted if its TLD is here (cuts false positives). */
 const COMMON_TLDS = new Set([
   "com", "net", "org", "io", "app", "co", "info", "biz", "xyz", "tk", "ml", "ga", "cf", "gq",
   "top", "click", "link", "gh", "ng", "africa", "site", "online", "store", "shop", "live", "sbs", "cfd", "gov",

@@ -33,7 +33,7 @@ export interface EnrichInput {
 
 /**
  * Compute reputation signals from redacted text. Pure + network-free (Tier 0). Never throws on bad
- * input; provider failures degrade gracefully. Does NOT itself check the feature flag — callers gate
+ * input; provider failures degrade gracefully. Does NOT itself check the feature flag, callers gate
  * invocation with {@link isThreatIntelEnabled} so analysis still works when the feature is off.
  */
 export function enrichThreatIntel(input: EnrichInput): ThreatIntelEnrichmentResult {

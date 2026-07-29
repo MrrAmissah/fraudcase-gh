@@ -116,7 +116,7 @@ export async function analyzeFraudCase(
  * Heuristics-based fallback generator for offline-first operation or missing keys.
  *
  * Grounding rule: entities are extracted ONLY from the supplied evidence text. This function never
- * invents names, domains, phone numbers, organizations, amounts, or locations — when a value is
+ * invents names, domains, phone numbers, organizations, amounts, or locations, when a value is
  * absent from the evidence, its list stays empty. Indicator strings are pattern descriptions and
  * deliberately avoid embedding any specific (fabricated) value.
  *
@@ -280,7 +280,7 @@ export function generateHeuristicMockAnalysis(
       names: [],
       organizations,
       amounts,
-      // Evidence-derived capture timestamps only — never a synthesized "today".
+      // Evidence-derived capture timestamps only, never a synthesized "today".
       dates: uniq(evidence.map(e => e.createdAt.split("T")[0])),
       transactionReferences,
       locations: []

@@ -93,7 +93,7 @@ function AppContent() {
     await addEvidence(created.id, {
       type: "note",
       title: "Imported from Quick Check",
-      originalText: result.redactedText, // already redacted/masked — no raw input
+      originalText: result.redactedText, // already redacted/masked, no raw input
     });
     return analyzeCase(created.id);
   };
@@ -327,7 +327,7 @@ function AppContent() {
 
   // Intercept views when user is not authenticated, shielding case folders
   const handleNavigate = (view: any) => {
-    // Public views — available without authentication.
+    // Public views, available without authentication.
     if (view === "landing" || view === "quick_check") {
       setActiveView(view);
       return;
@@ -352,7 +352,7 @@ function AppContent() {
       );
     }
 
-    // Public Quick Check — intentionally available without authentication.
+    // Public Quick Check, intentionally available without authentication.
     if (activeView === "quick_check") {
       return (
         <QuickCheckPage
@@ -477,13 +477,19 @@ function AppContent() {
       onSignOut={user ? signOut : undefined}
       isAdmin={isAdmin}
     >
-      {/* Global Toast for failures */}
+      {/* Global Toast for failures. Landing renders full-bleed, so the toast keeps
+          its own centered container rather than inheriting one from AppShell. */}
       {apiError && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 no-print animate-fade-in-out" id="global-alert-toast">
+        <div
+          className={`p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 no-print animate-fade-in-out ${
+            activeView === "landing" ? "max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 mt-6" : "mb-6"
+          }`}
+          id="global-alert-toast"
+        >
           <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
           <div className="space-y-1">
             <span className="text-xs font-bold text-red-700 font-mono uppercase block font-sans">System Warning</span>
-            <p className="text-xs text-red-650 leading-relaxed font-sans font-medium">{apiError}</p>
+            <p className="text-xs text-red-600 leading-relaxed font-sans font-medium">{apiError}</p>
           </div>
         </div>
       )}

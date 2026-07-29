@@ -16,7 +16,7 @@ interface RiskSignalsPanelProps {
 /**
  * "Risk signals" panel. Renders Tier-0 LOCAL indicators and a separate EXTERNAL reputation section
  * (reads "Not checked" until a provider is enabled). Renders nothing when the feature is off, so it
- * ships dark until THREAT_INTEL_ENABLED. Supporting context only — never presented as proof.
+ * ships dark until THREAT_INTEL_ENABLED. Supporting context only, never presented as proof.
  */
 export default function RiskSignalsPanel({ riskSignals }: RiskSignalsPanelProps) {
   if (!riskSignals || !riskSignals.enabled) return null;
@@ -45,7 +45,7 @@ export default function RiskSignalsPanel({ riskSignals }: RiskSignalsPanelProps)
                 </span>
                 <span className="text-slate-700">
                   <span className="font-medium break-all">{s.safeDisplayValue}</span>
-                  <span className="text-slate-500"> — {s.explanation}</span>
+                  <span className="text-slate-500"> · {s.explanation}</span>
                 </span>
               </li>
             ))}
@@ -68,7 +68,7 @@ export default function RiskSignalsPanel({ riskSignals }: RiskSignalsPanelProps)
                 </span>
                 <span className="text-slate-700">
                   <span className="font-medium break-all">{s.safeDisplayValue}</span>
-                  <span className="text-slate-500"> — {s.explanation}</span>
+                  <span className="text-slate-500"> · {s.explanation}</span>
                 </span>
               </li>
             ))}
@@ -85,7 +85,7 @@ export default function RiskSignalsPanel({ riskSignals }: RiskSignalsPanelProps)
       )}
 
       <p className="text-[11px] text-slate-400 italic border-t border-slate-100 pt-2">
-        Supporting context only — possible matches that need verification, not proof.
+        Supporting context only: possible matches that need verification, not proof.
       </p>
     </div>
   );

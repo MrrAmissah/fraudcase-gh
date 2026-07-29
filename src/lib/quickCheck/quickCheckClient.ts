@@ -1,7 +1,7 @@
 import { QuickCheckResult } from "../../types/quickCheck";
 
 /**
- * Public Quick Check API client. No authentication header is sent — this is the
+ * Public Quick Check API client. No authentication header is sent, this is the
  * intentional no-sign-up path. The server redacts the submitted text before any AI
  * analysis and persists nothing.
  */

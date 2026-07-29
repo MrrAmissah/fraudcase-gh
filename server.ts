@@ -119,7 +119,7 @@ const verifyCaptcha = createCaptchaMiddleware();
 const publicAnalyzeTimeout = makeRequestTimeout(20000);
 
 // Conservative entity extraction from REDACTED text only. Unlike the heuristic analyzer's
-// demo fillers, this never fabricates names/phones — it surfaces only what is genuinely
+// demo fillers, this never fabricates names/phones: it surfaces only what is genuinely
 // present (URLs, monetary amounts, and phone tokens already masked by the redaction guard).
 function quickCheckEntities(redactedText: string): ExtractedEntities {
   const urls = Array.from(
@@ -151,11 +151,11 @@ const PUBLIC_UPLOAD_TEXT_GUIDANCE =
 
 // Shared Quick Check pipeline used by BOTH the paste and file-upload endpoints so the
 // redaction/analysis logic lives in exactly one place. It redacts first, analyzes the REDACTED
-// text only, and returns an EPHEMERAL result — it writes nothing to Firestore, Storage, or disk.
+// text only, and returns an EPHEMERAL result: it writes nothing to Firestore, Storage, or disk.
 async function buildQuickCheckResult(rawText: string): Promise<QuickCheckResult> {
   const input = rawText.slice(0, QC_MAX_INPUT_CHARS);
 
-  // 1. Redact BEFORE analysis — raw text is never sent to the AI and never stored.
+  // 1. Redact BEFORE analysis: raw text is never sent to the AI and never stored.
   const redaction = redactPIIAndSecrets(input);
 
   // 2. Analyze the redacted text only (server-side Gemini; heuristic fallback if no key).
@@ -275,7 +275,7 @@ async function startServer() {
   });
 
   // Configure multer for secure memory storage. Files are held in memory only for
-  // processing (redaction + validation) and streamed to Cloud Storage — no permanent
+  // processing (redaction + validation) and streamed to Cloud Storage: no permanent
   // temp file is written on the happy path. See the upload route for the dev-only fallback.
   const MAX_FILE_BYTES = 10 * 1024 * 1024; // Strict 10MB cap
   const upload = multer({
@@ -310,7 +310,7 @@ async function startServer() {
   }
 
   // Public Quick Check uploads use a STRICTER 5MB cap (vs 10MB for authenticated case evidence)
-  // and a single file. Bytes are held in memory only and processed ephemerally — never stored.
+  // and a single file. Bytes are held in memory only and processed ephemerally: never stored.
   const MAX_PUBLIC_FILE_BYTES = 5 * 1024 * 1024; // 5MB public cap
   const publicUpload = multer({
     storage: multer.memoryStorage(),
@@ -714,7 +714,7 @@ async function startServer() {
         storagePath,
         fileUrl: `/api/cases/${id}/evidence/${evidenceId}/file`,
         downloadUrl: `/api/cases/${id}/evidence/${evidenceId}/file?download=true`,
-        // Raw readable file bytes are never persisted — only the redacted, length-capped text.
+        // Raw readable file bytes are never persisted: only the redacted, length-capped text.
         originalText: undefined,
         extractedText: isReadable ? safeText : undefined,
         redactedText: safeText || undefined,
@@ -953,7 +953,7 @@ async function startServer() {
   // from the owner's private storage path (never a client URL), runs pass A extraction, redacts,
   // and persists ONLY the redacted artifact (embedded) + an audit run (subcollection). Raw OCR text
   // stays in request memory and is never written or logged. Extracted facts are suggestions until
-  // the owner accepts them — see the verification route and the analysis integration.
+  // the owner accepts them: see the verification route and the analysis integration.
   function detectedKindToMime(kind: "png" | "jpeg" | "pdf" | "webp" | "text" | "unknown"): string {
     if (kind === "png") return "image/png";
     if (kind === "jpeg") return "image/jpeg";
@@ -1042,7 +1042,7 @@ async function startServer() {
         runId,
       });
 
-      // Always persist the audit run (succeeded/failed/timeout) — never any text/prompt/response.
+      // Always persist the audit run (succeeded/failed/timeout): never any text/prompt/response.
       await docRef.collection("extractionRuns").doc(runId).set(result.run);
 
       // Update only the extraction fields on the evidence item via the keystone-guarded builder.
@@ -1333,7 +1333,7 @@ async function startServer() {
 
   // --- PUBLIC QUICK CHECK (no auth; rate-limited; nothing is persisted) ---
   // Intentionally bypasses requireAuth. Redacts the submitted text before any AI call and
-  // writes nothing to Firestore/Storage/disk — anonymous submissions are never stored.
+  // writes nothing to Firestore/Storage/disk: anonymous submissions are never stored.
   app.post("/api/quick-check/analyze", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, quickCheckBurstLimit, quickCheckRateLimit, async (req: any, res: any) => {
     try {
       const { text } = req.body || {};
@@ -1355,8 +1355,8 @@ async function startServer() {
   });
 
   // PUBLIC Quick Check file upload (no auth, rate-limited). Accepts READABLE TEXT files only
-  // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here — there is no OCR/text
-  // extraction — so we return clear guidance instead of pretending. Nothing is ever stored: the
+  // (TXT/CSV/JSON/HTML). Images/PDFs are validated but not analyzed here: there is no OCR/text
+  // extraction: so we return clear guidance instead of pretending. Nothing is ever stored: the
   // handler intentionally has no Firestore/Storage/disk write path.
   app.post("/api/quick-check/analyze-file", publicAnalyzeTimeout, verifyAppCheck, verifyCaptcha, uploadBurstLimit, quickCheckRateLimit, publicUploadSingle, async (req: any, res: any) => {
     try {
@@ -1380,7 +1380,7 @@ async function startServer() {
         return;
       }
 
-      // Read bytes as UTF-8 text. HTML is treated as plain text — it is never parsed or rendered.
+      // Read bytes as UTF-8 text. HTML is treated as plain text: it is never parsed or rendered.
       const rawText = req.file.buffer.toString("utf-8");
       if (!rawText.trim()) {
         res.status(400).json({ error: "That file contained no readable text to check." });
@@ -1423,7 +1423,7 @@ async function startServer() {
       }
 
       // Privacy guard: a properly redacted string is idempotent under the redaction guard.
-      // If re-redacting changes it, raw sensitive data is present — reject, store nothing.
+      // If re-redacting changes it, raw sensitive data is present: reject, store nothing.
       const recheck = redactPIIAndSecrets(redactedText);
       if (recheck.redactedText !== redactedText) {
         res.status(400).json({
@@ -1530,7 +1530,7 @@ async function startServer() {
         updates.reviewedStatus = reviewedStatus;
       }
       if (adminNote !== undefined) {
-        // Defensive: redact the admin note too — this collection never stores raw identifiers.
+        // Defensive: redact the admin note too: this collection never stores raw identifiers.
         updates.adminNote = redactPIIAndSecrets(String(adminNote).slice(0, 1000)).redactedText;
       }
       if (clusterId !== undefined) {

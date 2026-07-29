@@ -17,7 +17,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 }
 
 /**
- * Capability probe — returns whether the signed-in user is an admin. Non-fatal:
+ * Capability probe, returns whether the signed-in user is an admin. Non-fatal:
  * returns false on any error so it can never break the rest of app startup.
  */
 export async function getAdminStatus(): Promise<boolean> {

@@ -1,5 +1,5 @@
 /**
- * Owner isolation helpers — single source of truth for case ownership checks
+ * Owner isolation helpers, single source of truth for case ownership checks
  * and safe case update field whitelisting. Used by server.ts and regression tests.
  */
 

@@ -17,7 +17,7 @@ interface AnalysisVisualSummaryProps {
 
 /**
  * Executive-readable visual summary of an analysis. Every element is a pure rendering of fields
- * that already exist on the analysis (riskScore, confidence, indicators, entities, checklist) —
+ * that already exist on the analysis (riskScore, confidence, indicators, entities, checklist),
  * it introduces no new analysis logic and authors no verdict-like prose. The detailed text
  * sections still render below this component.
  */
@@ -140,7 +140,7 @@ export default function AnalysisVisualSummary({
         </div>
       </div>
 
-      {/* What this means — sourced from existing non-accusatory fields only */}
+      {/* What this means, sourced from existing non-accusatory fields only */}
       <div className="px-5 pb-5">
         <div className="flex items-start gap-2.5 p-4 rounded-lg bg-cyan-50/40 border border-cyan-100">
           <Info size={15} className="text-cyan-600 flex-shrink-0 mt-0.5" />

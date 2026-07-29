@@ -77,7 +77,7 @@ export default function ReportPreview({ fraudCase, onBack }: ReportPreviewProps)
           <div className="flex items-center gap-2">
             <button
               onClick={triggerMockPDFDownload}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-250 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-sans font-semibold transition-all cursor-pointer"
               id="report-print-btn"
             >
               <Printer size={14} />
@@ -102,7 +102,7 @@ export default function ReportPreview({ fraudCase, onBack }: ReportPreviewProps)
       </div>
 
       {/* Main Dossier Report Page (A4 formatted styling block) */}
-      <div className="bg-white border border-slate-250 p-8 sm:p-12 rounded-2xl shadow-xl space-y-10 relative overflow-hidden" id="report-printable-dossier">
+      <div className="bg-white border border-slate-200 p-8 sm:p-12 rounded-2xl shadow-xl space-y-10 relative overflow-hidden" id="report-printable-dossier">
         
         {/* Micro visual cyber stripe */}
         <div className="absolute top-0 left-0 right-0 h-[4px] bg-cyan-600" />
@@ -112,7 +112,7 @@ export default function ReportPreview({ fraudCase, onBack }: ReportPreviewProps)
           <div className="space-y-2.5">
             <div className="flex items-center">
               <BrandLogo variant="full" height={40} />
-              <div className="ml-3 pl-3 border-l border-slate-250 text-[16px] font-bold text-slate-800 font-sans tracking-widest uppercase self-center">
+              <div className="ml-3 pl-3 border-l border-slate-200 text-[16px] font-bold text-slate-800 font-sans tracking-widest uppercase self-center">
                 REPORT
               </div>
             </div>

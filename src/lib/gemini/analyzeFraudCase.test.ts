@@ -50,7 +50,7 @@ test("suspicious verification URL is not classified low risk", () => {
 });
 
 test("no invented names or locations are returned", () => {
-  // Evidence contains no personal name or location — these lists must be empty, never fabricated.
+  // Evidence contains no personal name or location, these lists must be empty, never fabricated.
   const analysis = generateHeuristicMockAnalysis(
     "Delivery fee SMS",
     "Parcel delivery clearance fee requested.",
@@ -63,7 +63,7 @@ test("no invented names or locations are returned", () => {
 
 test("no fabricated url/amount/phone when evidence contains none", () => {
   // This case still classifies as fake_delivery (which previously injected placeholder
-  // url/amount/phone fillers) — but with no such values in the evidence the lists stay empty.
+  // url/amount/phone fillers), but with no such values in the evidence the lists stay empty.
   const analysis = generateHeuristicMockAnalysis(
     "Delivery issue",
     "A parcel delivery problem was reported with no link or amount provided.",

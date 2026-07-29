@@ -1,10 +1,55 @@
+/* The font import MUST stay above `@import "tailwindcss"`. Tailwind's import is
+   expanded inline, so any @import after it ends up thousands of lines into the
+   generated stylesheet, where CSS forbids @import and postcss drops it. When
+   that happened, Inter never loaded and the whole UI silently fell back to a
+   system font. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 @import "tailwindcss";
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+/* Inter renders noticeably heavier than intended on macOS without this, which is
+   the main reason the UI read as "thick". Grayscale antialiasing thins the stems
+   back to the designed weight. */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Brand ramp. The primary accent across the product is this blue. */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-brand-800: #1e40af;
+  --color-brand-900: #1e3a8a;
+  --color-brand-950: #172554;
+
+  /* The accent was originally cyan and is still spelled `cyan-*` in ~24 older
+     components. Rather than churn every one of those files, the cyan steps that
+     are actually used are aliased onto the brand ramp so the whole app re-themes
+     from here. New components should use `brand-*` directly. */
+  --color-cyan-50: var(--color-brand-50);
+  --color-cyan-100: var(--color-brand-100);
+  --color-cyan-200: var(--color-brand-200);
+  --color-cyan-300: var(--color-brand-300);
+  --color-cyan-400: var(--color-brand-400);
+  --color-cyan-500: var(--color-brand-500);
+  --color-cyan-600: var(--color-brand-600);
+  --color-cyan-700: var(--color-brand-700);
+  --color-cyan-800: var(--color-brand-800);
+  --color-cyan-900: var(--color-brand-900);
+
+  /* Surface tints used by the landing bands. */
+  --color-canvas: #f6f8fc;
 }
 
 /* Print Specific Rules for Dossier Exports */
@@ -50,7 +95,7 @@
     color: black !important;
   }
 
-  .border, .border-slate-200, .border-slate-250, .border-slate-800, .border-slate-850 {
+  .border, .border-slate-200, .border-slate-800 {
     border-color: #d1d5db !important;
   }
 
