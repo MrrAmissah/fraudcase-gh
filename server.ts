@@ -1599,4 +1599,8 @@ process.on("unhandledRejection", (reason) => {
 
 startServer().catch((error) => {
   logEvent({ event: "server_boot_failed", level: "error", errorType: safeErrorType(error) });
+  // Exit non-zero: a process that failed to boot must not look like a clean shutdown to Cloud Run,
+  // a container restart policy, or CI. Route registration errors land here (express 5 rejects some
+  // express 4 path patterns outright), and those used to exit 0 with only a log line.
+  process.exit(1);
 });

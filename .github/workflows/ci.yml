@@ -29,6 +29,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Boots the built bundle and probes real routes. Needs dist/, so it must follow Build.
+      # Requires no secrets: firebase-admin resolves credentials lazily and every probe stays on
+      # the near side of any Firestore or Gemini call.
+      - name: Server smoke test
+        run: npm run test:smoke
+
       - name: Environment template check
         run: npm run check:env
 
