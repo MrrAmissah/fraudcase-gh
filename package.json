@@ -14,35 +14,35 @@
     "check:multimodal-readiness": "node scripts/check-multimodal-readiness.mjs"
   },
   "dependencies": {
-    "@google/genai": "^2.10.0",
-    "@tailwindcss/vite": "^4.3.2",
-    "@vitejs/plugin-react": "^6.0.3",
+    "@google/genai": "^2.14.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.0.4",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
-    "firebase": "^12.15.0",
+    "express": "^5.2.1",
+    "firebase": "^12.16.0",
     "firebase-admin": "^14.1.0",
     "jspdf": "^4.2.1",
-    "lucide-react": "^1.22.0",
-    "motion": "^12.42.0",
+    "lucide-react": "^1.27.0",
+    "motion": "^12.43.0",
     "multer": "^2.2.0",
-    "react": "^19.0.1",
-    "react-dom": "^19.0.1",
-    "vite": "^8.1.2"
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "vite": "^8.1.5"
   },
   "overrides": {
     "rimraf": "^6.0.1"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
+    "@types/express": "^5.0.6",
     "@types/multer": "^2.2.0",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.5.2",
+    "autoprefixer": "^10.5.4",
     "esbuild": "^0.28.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.23.1",
     "typescript": "~7.0.2",
-    "vite": "^8.1.2"
+    "vite": "^8.1.5"
   }
 }
