@@ -10,6 +10,7 @@
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
     "test": "node --import tsx --test \"src/lib/gemini/*.test.ts\" \"src/lib/security/*.test.ts\" \"src/lib/observability/*.test.ts\" \"src/lib/extraction/__tests__/*.test.ts\" \"src/lib/config/*.test.ts\" \"src/lib/threat-intel/__tests__/*.test.ts\" \"src/lib/cases/*.test.ts\"",
+    "test:smoke": "node scripts/smoke-server.mjs",
     "check:env": "node scripts/check-env.mjs",
     "check:multimodal-readiness": "node scripts/check-multimodal-readiness.mjs"
   },
