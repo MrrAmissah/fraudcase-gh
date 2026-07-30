@@ -38,5 +38,12 @@ service cloud.firestore {
     match /communitySignals/{signalId} {
       allow read, write: if false;
     }
+
+    // Rate-limit counters — written/read only by the backend (Admin SDK), which bypasses these
+    // rules. Explicitly denied to clients: a client that could write here would lift its own caps
+    // on the public, Gemini-billed endpoints. Document ids are salted HMACs, never raw IPs.
+    match /rateLimits/{counterId} {
+      allow read, write: if false;
+    }
   }
 }
