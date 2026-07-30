@@ -12,6 +12,10 @@ FraudCase GH turns a confusing pile of suspicious SMS, WhatsApp messages, links,
 
 > **Positioning:** FraudCase GH is a decision-support and evidence-organization tool, **not** a law-enforcement system and **not** a verdict on any person.
 
+<div align="center">
+  <img src="docs/screenshots/landing.png" alt="FraudCase GH landing page: hero headline, a Quick Check result panel showing a segmented risk dial scoring 88 as critical risk with masked sender details, and the privacy trust strip below" width="100%" />
+</div>
+
 ---
 
 ## Table of contents
