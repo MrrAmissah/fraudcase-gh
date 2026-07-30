@@ -21,14 +21,13 @@ export interface ApplyVerificationInput {
 
 export type VerificationFailure = "no_artifact" | "fact_not_found" | "invalid_decision";
 
-// Flat result (matches the repo's FileValidationResult style); boolean-discriminant union
-// narrowing is unreliable under the project's non-strict tsconfig.
-export interface ApplyVerificationResult {
-  ok: boolean;
-  reason?: VerificationFailure;
-  artifact?: ExtractedArtifact;
-  fact?: ExtractedFact;
-}
+// Discriminated union: `if (!result.ok) return;` narrows `artifact` and `fact` to defined for the
+// rest of the scope, which is how both server.ts and the unit tests already branch. The previous
+// flat shape (`ok: boolean` with every payload optional) could not narrow, so callers had to reach
+// for non-null assertions or silently accept `possibly undefined` under strictNullChecks.
+export type ApplyVerificationResult =
+  | { ok: true; artifact: ExtractedArtifact; fact: ExtractedFact }
+  | { ok: false; reason: VerificationFailure };
 
 export function applyFactVerification(input: ApplyVerificationInput): ApplyVerificationResult {
   if (input.decision !== "accept" && input.decision !== "reject") {
