@@ -7,6 +7,7 @@ import { FraudCase } from "./src/types/fraudCase";
 import { EvidenceItem } from "./src/types/evidence";
 import { ExtractedEntities } from "./src/types/analysis";
 import { QuickCheckResult } from "./src/types/quickCheck";
+import { CommunitySignal } from "./src/types/communitySignal";
 import { analyzeFraudCase } from "./src/lib/gemini/analyzeFraudCase";
 import { adminDb, adminAuth, adminStorage } from "./src/lib/firebase/admin";
 import { redactPIIAndSecrets } from "./src/lib/security/redaction";
@@ -1438,7 +1439,9 @@ async function startServer() {
       const amountRequested = entities.amounts[0] || null;
 
       const signalId = `sig-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const signal = {
+      // Typed against the stored document shape (id is the Firestore doc id, not a field), so the
+      // write is checked against what the admin routes and client expect to read back.
+      const signal: Omit<CommunitySignal, "id"> = {
         source: "quick_check",
         consentGiven: true,
         redactedText,
