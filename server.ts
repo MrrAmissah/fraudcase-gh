@@ -38,7 +38,8 @@ import { logEvent, logRouteError, safeErrorType } from "./src/lib/observability/
 const THREAT_INTEL_PROVIDERS = [webRiskProvider, virusTotalProvider, abuseIpdbProvider, urlscanProviderStub];
 const threatIntelCache = createMemoryCache();
 import { createAppCheckMiddleware } from "./src/lib/security/appCheck";
-import { getRateLimitStore, makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
+import { makeDailyRateLimit, makeBurstRateLimit } from "./src/lib/security/rateLimit";
+import { createRateLimitStore } from "./src/lib/security/firestoreRateLimitStore";
 import { createCaptchaMiddleware } from "./src/lib/security/captcha";
 import { makeRequestTimeout } from "./src/lib/security/requestTimeout";
 import {
@@ -64,23 +65,32 @@ const SIGNAL_DAILY_LIMIT = 10; // anonymous community-signal submissions per IP 
 const QC_MAX_INPUT_CHARS = 5000; // public input length cap
 const PUBLIC_JSON_MAX_BYTES = 1 * 1024 * 1024; // 1MB cap for public text endpoints (analyze, submit-signal)
 
-// Public-route rate limiting (getClientIp, daily + burst limiters, and the shared-store seam)
-// now lives in src/lib/security/rateLimit.ts. Behavior is preserved exactly; a Redis-backed shared
-// store can be added via RATE_LIMIT_REDIS_URL later (see docs/SHARED_RATE_LIMIT_PLAN.md).
+// Public-route rate limiting (getClientIp, daily + burst limiters, and the store seam) lives in
+// src/lib/security/rateLimit.ts. The store is selected from the environment: in-memory by default,
+// Firestore-backed when RATE_LIMIT_STORE=firestore, which is what makes the caps hold across Cloud
+// Run instances. See docs/SHARED_RATE_LIMIT_PLAN.md.
+const rateLimitStore = createRateLimitStore({ env: process.env, db: adminDb });
 
-const rateLimitStore = getRateLimitStore();
+// These routes each bill a Gemini call, so a limiter outage must not become an unmetered
+// allowance: refuse with 503 rather than letting requests through unmetered.
+const PUBLIC_LIMIT_OPTIONS = {
+  failMode: "closed" as const,
+  unavailableMessage: "Quick Check is temporarily unavailable. Please try again in a moment.",
+};
 
 const quickCheckRateLimit = makeDailyRateLimit(
   "qc_analyze",
   QC_DAILY_LIMIT,
   "You've reached today's free Quick Check limit. Create a free account to keep checking evidence.",
   rateLimitStore,
+  PUBLIC_LIMIT_OPTIONS,
 );
 const submitSignalRateLimit = makeDailyRateLimit(
   "signal",
   SIGNAL_DAILY_LIMIT,
   "You've reached today's limit for sharing community signals. Please try again tomorrow.",
   rateLimitStore,
+  PUBLIC_LIMIT_OPTIONS,
 );
 
 // Short-window burst caps (per client): analyze 5 / 5 min, file 3 / 5 min, signal 5 / 10 min.
@@ -90,6 +100,7 @@ const quickCheckBurstLimit = makeBurstRateLimit(
   5 * 60 * 1000,
   "You're checking a little too fast. Please wait a moment and try again.",
   rateLimitStore,
+  PUBLIC_LIMIT_OPTIONS,
 );
 const uploadBurstLimit = makeBurstRateLimit(
   "qc_file_burst",
@@ -97,6 +108,7 @@ const uploadBurstLimit = makeBurstRateLimit(
   5 * 60 * 1000,
   "Too many file checks in a short time. Please wait a few minutes and try again.",
   rateLimitStore,
+  PUBLIC_LIMIT_OPTIONS,
 );
 const signalBurstLimit = makeBurstRateLimit(
   "signal_burst",
@@ -104,6 +116,7 @@ const signalBurstLimit = makeBurstRateLimit(
   10 * 60 * 1000,
   "Too many signal submissions in a short time. Please wait a few minutes and try again.",
   rateLimitStore,
+  PUBLIC_LIMIT_OPTIONS,
 );
 
 // App Check verification for public abuse-prone routes. DEFAULT-OFF: passes through

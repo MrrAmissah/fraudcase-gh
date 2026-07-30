@@ -1,15 +1,16 @@
 /**
  * Shared rate limiting for public, abuse-prone routes.
  *
- * This extracts the previously-inline in-memory limiters from server.ts behind a
- * small async {@link RateLimitStore} interface so a Redis/Upstash-backed shared
- * store (for multi-instance production) can be slotted in later via
- * RATE_LIMIT_REDIS_URL, see docs/SHARED_RATE_LIMIT_PLAN.md.
+ * The limiters live behind a small async {@link RateLimitStore} interface. The in-memory store here
+ * is per-process, which is fine for dev and single-instance deploys but NOT for production: Cloud
+ * Run scales to 20 instances with no session affinity, so a caller landing on a different instance
+ * gets a fresh counter. The shared implementation is {@link ./firestoreRateLimitStore}, selected via
+ * `RATE_LIMIT_STORE=firestore`; design and rollout are in docs/SHARED_RATE_LIMIT_PLAN.md.
  *
- * Behavior is preserved exactly with the default in-memory store: the same daily
- * and burst caps, the same fixed-window semantics, the same 429 messages, and the
- * same getClientIp()/TRUST_PROXY handling. Keys are namespaced per limiter so a
- * single shared store does not mix counters across routes.
+ * Window semantics, caps, 429 messages, and getClientIp()/TRUST_PROXY handling are identical across
+ * both stores. Keys are namespaced per limiter so one shared store never mixes counters across
+ * routes. Store failures are a separate condition from being over the limit: see
+ * {@link RateLimitFailMode}.
  */
 
 import { logEvent, safeErrorType } from "../observability/logger";
@@ -102,18 +103,55 @@ export class MemoryRateLimitStore implements RateLimitStore {
 let sharedStore: RateLimitStore | null = null;
 
 /**
- * Returns the process-wide rate limit store. If RATE_LIMIT_REDIS_URL is set we
- * log that the shared Redis store is not yet wired (rather than silently behaving
- * as if it were shared) and fall back to in-memory. The Redis implementation is
- * tracked in docs/SHARED_RATE_LIMIT_PLAN.md.
+ * Returns the process-wide in-memory store.
+ *
+ * Prefer `createRateLimitStore` from ./firestoreRateLimitStore, which returns this when Firestore
+ * limiting is not configured and the shared store when it is. This function is kept for callers and
+ * tests that specifically want per-process limiting.
  */
 export function getRateLimitStore(): RateLimitStore {
   if (sharedStore) return sharedStore;
-  if (process.env.RATE_LIMIT_REDIS_URL) {
-    logEvent({ event: "rate_limit_redis_not_implemented", level: "warn" });
-  }
   sharedStore = new MemoryRateLimitStore();
   return sharedStore;
+}
+
+/**
+ * What to do when the store itself fails (a shared store can, unlike the in-memory one).
+ *
+ * `closed` refuses the request. On the public routes that is the correct default: each one bills a
+ * Gemini call, so an unavailable limiter must not become an unmetered allowance. `open` lets the
+ * request through and is for routes where availability matters more than metering.
+ */
+export type RateLimitFailMode = "open" | "closed";
+
+export interface RateLimitOptions {
+  /** Defaults to `closed`. */
+  failMode?: RateLimitFailMode;
+  /** Body returned when the store failed. Deliberately distinct from the over-limit message. */
+  unavailableMessage?: string;
+}
+
+const DEFAULT_UNAVAILABLE_MESSAGE = "This check is temporarily unavailable. Please try again in a moment.";
+
+/**
+ * Resolve a store outage into a response.
+ *
+ * A store failure returns 503, never 429. They are different conditions and conflating them would
+ * tell a user they hit a quota they did not hit, and would make the two indistinguishable in logs
+ * exactly when an operator needs to tell them apart.
+ */
+function handleStoreError(err: unknown, res: any, namespace: string, options?: RateLimitOptions): boolean {
+  const failMode = options?.failMode ?? "closed";
+  logEvent({
+    event: "rate_limit_store_error",
+    level: "error",
+    errorType: safeErrorType(err),
+    // Limiter namespace and the applied policy only: no key, no IP, nothing caller-derived.
+    meta: { namespace, failMode },
+  });
+  if (failMode === "open") return true;
+  res.status(503).json({ error: options?.unavailableMessage ?? DEFAULT_UNAVAILABLE_MESSAGE });
+  return false;
 }
 
 /** Per-IP DAILY limiter middleware. Namespaced so limiters don't share counters. */
@@ -122,17 +160,17 @@ export function makeDailyRateLimit(
   limit: number,
   overLimitMessage: string,
   store: RateLimitStore,
+  options?: RateLimitOptions,
 ) {
   return async function (req: any, res: any, next: any): Promise<void> {
     const key = `${namespace}:${getClientIp(req)}`;
-    let allowed = true;
+    let allowed: boolean;
     try {
       allowed = await store.hitDaily(key, limit);
     } catch (err) {
-      // The in-memory store never throws. A future shared store will define an
-      // explicit fail-closed policy (SHARED_RATE_LIMIT_PLAN.md); for now, fail open.
-      logEvent({ event: "rate_limit_store_error", level: "warn", errorType: safeErrorType(err) });
-      allowed = true;
+      if (!handleStoreError(err, res, namespace, options)) return;
+      next();
+      return;
     }
     if (!allowed) {
       res.status(429).json({ error: overLimitMessage });
@@ -149,15 +187,17 @@ export function makeBurstRateLimit(
   windowMs: number,
   overLimitMessage: string,
   store: RateLimitStore,
+  options?: RateLimitOptions,
 ) {
   return async function (req: any, res: any, next: any): Promise<void> {
     const key = `${namespace}:${getClientIp(req)}`;
-    let allowed = true;
+    let allowed: boolean;
     try {
       allowed = await store.hitBurst(key, limit, windowMs);
     } catch (err) {
-      logEvent({ event: "rate_limit_store_error", level: "warn", errorType: safeErrorType(err) });
-      allowed = true;
+      if (!handleStoreError(err, res, namespace, options)) return;
+      next();
+      return;
     }
     if (!allowed) {
       res.status(429).json({ error: overLimitMessage });
