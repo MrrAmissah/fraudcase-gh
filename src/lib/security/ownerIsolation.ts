@@ -12,11 +12,19 @@ export const CASE_UPDATE_ALLOWED_FIELDS = [
 
 export type CaseUpdateField = (typeof CASE_UPDATE_ALLOWED_FIELDS)[number];
 
-/** Returns true when the authenticated user owns the case document. */
-export function isCaseOwner(
-  caseData: { ownerId?: string } | null | undefined,
+/**
+ * Returns true when the authenticated user owns the case document.
+ *
+ * Declared as a type predicate, not a plain boolean: callers get `caseData` narrowed to defined
+ * after the standard `if (!isCaseOwner(caseData, uid)) return;` guard. Firestore's `doc.data()` is
+ * typed `T | undefined`, so without this every field read after the ownership check would be a
+ * `possibly undefined` error under strictNullChecks. Runtime behavior is unchanged: a missing
+ * document or a missing ownerId still fails the check.
+ */
+export function isCaseOwner<T extends { ownerId?: string }>(
+  caseData: T | null | undefined,
   authenticatedUid: string
-): boolean {
+): caseData is T {
   if (!caseData?.ownerId || !authenticatedUid) return false;
   return caseData.ownerId === authenticatedUid;
 }
